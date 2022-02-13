@@ -2,22 +2,20 @@
 #define AS2_TRAJECTORY_GENERATOR_HPP_
 
 #include <rclcpp/rclcpp.hpp>
+
 #include "as2_core/node.hpp"
-
-#include "as2_msgs/msg/trajectory_waypoints_with_id.hpp"
 #include "as2_msgs/msg/trajectory_waypoints.hpp"
-#include "nav_msgs/msg/odometry.hpp"
-#include "trajectory_msgs/msg/joint_trajectory_point.hpp"
-#include "nav_msgs/msg/path.hpp"
-#include "geometry_msgs/msg/pose_stamped.hpp"
-
+#include "as2_msgs/msg/trajectory_waypoints_with_id.hpp"
 #include "as2_msgs/srv/send_trajectory_waypoints.hpp"
 #include "as2_msgs/srv/set_speed.hpp"
-#include "tf2/transform_datatypes.h"
-#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
-
 #include "dynamic_trajectory_generator/dynamic_trajectory.hpp"
 #include "dynamic_trajectory_generator/dynamic_waypoint.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "nav_msgs/msg/path.hpp"
+#include "tf2/transform_datatypes.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
+#include "trajectory_msgs/msg/joint_trajectory_point.hpp"
 
 #define SET_WAYPOINTS_TOPIC "set_trajectory_waypoints"
 #define ADD_WAYPOINTS_TOPIC "add_trajectory_waypoints"
@@ -25,14 +23,14 @@
 #define ODOM_TOPIC "self_localization"
 #define WAYPOINTS_TOPIC "motion_reference/waypoints"
 
-class As2TrajectoryGenerator : public as2::Node
-{
-public:
+class As2TrajectoryGenerator : public as2::Node {
+  public:
   As2TrajectoryGenerator();
+  ~As2TrajectoryGenerator();
   void setup();
   void run();
 
-private:
+  private:
   /** Services **/
   rclcpp::Service<as2_msgs::srv::SendTrajectoryWaypoints>::SharedPtr set_trajectory_waypoints_srv_;
   rclcpp::Service<as2_msgs::srv::SendTrajectoryWaypoints>::SharedPtr add_trajectory_waypoints_srv_;
@@ -64,6 +62,8 @@ private:
   dynamic_traj_generator::References references_;
   dynamic_traj_generator::DynamicWaypoint drone_state_point_;
 
+  std::thread plot_thread_;
+
   bool evaluateTrajectory(double _eval_time);
 
   /** Publish **/
@@ -76,18 +76,22 @@ private:
   void addTrajectoryWaypointsSrvCall(
       const std::shared_ptr<as2_msgs::srv::SendTrajectoryWaypoints::Request> _request,
       std::shared_ptr<as2_msgs::srv::SendTrajectoryWaypoints::Response> _response);
-  void setSpeedSrvCall(
-      const std::shared_ptr<as2_msgs::srv::SetSpeed::Request> _request,
-      std::shared_ptr<as2_msgs::srv::SetSpeed::Response> _response);
+  void setSpeedSrvCall(const std::shared_ptr<as2_msgs::srv::SetSpeed::Request> _request,
+                       std::shared_ptr<as2_msgs::srv::SetSpeed::Response> _response);
   /** Topic Callbacks **/
   void modifyWaypointCallback(const as2_msgs::msg::PoseStampedWithID::SharedPtr _msg);
   void odomCallback(const nav_msgs::msg::Odometry::SharedPtr _msg);
   void waypointsCallback(const as2_msgs::msg::TrajectoryWaypoints::SharedPtr _msg);
+  void plotTrajectory();
+  void plotTrajectoryThread();
 };
 
 /** Auxiliar Functions **/
-void generateDynamicPoint(const as2_msgs::msg::PoseStampedWithID &msg, dynamic_traj_generator::DynamicWaypoint &dynamic_point);
-void generateDynamicPoint(const geometry_msgs::msg::PoseStamped &msg, dynamic_traj_generator::DynamicWaypoint &dynamic_point);
-void generateDynamicPoint(const nav_msgs::msg::Odometry &msg, dynamic_traj_generator::DynamicWaypoint &dynamic_point);
+void generateDynamicPoint(const as2_msgs::msg::PoseStampedWithID &msg,
+                          dynamic_traj_generator::DynamicWaypoint &dynamic_point);
+void generateDynamicPoint(const geometry_msgs::msg::PoseStamped &msg,
+                          dynamic_traj_generator::DynamicWaypoint &dynamic_point);
+void generateDynamicPoint(const nav_msgs::msg::Odometry &msg,
+                          dynamic_traj_generator::DynamicWaypoint &dynamic_point);
 
-#endif // AS2_TRAJECTORY_GENERATOR_HPP_
+#endif  // AS2_TRAJECTORY_GENERATOR_HPP_
