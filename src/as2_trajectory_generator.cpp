@@ -169,15 +169,16 @@ void As2TrajectoryGenerator::setSpeedSrvCall(
     const std::shared_ptr<as2_msgs::srv::SetSpeed::Request> _request,
     std::shared_ptr<as2_msgs::srv::SetSpeed::Response> _response)
 {
-  RCLCPP_INFO(this->get_logger(), "Speed to be set has been received");
-  _response->success;
 
   float max_speed = _request->speed.speed;
+  RCLCPP_INFO(this->get_logger(), "Speed (%n) to be set has been received", max_speed);
   if (max_speed <= 0.0)
   {
     RCLCPP_WARN(this->get_logger(), "Speed must be > 0.0 m/s");
+    _response->success = false;
     return;
   }
+  _response->success = true;
 
   trajectory_generator_.setSpeed(max_speed);
 }
@@ -202,7 +203,6 @@ void As2TrajectoryGenerator::odomCallback(const nav_msgs::msg::Odometry::SharedP
 {
   nav_msgs::msg::Odometry current_pose = *(_msg.get());
   generateDynamicPoint(current_pose, drone_state_point_);
-  dyna
 }
 
 void As2TrajectoryGenerator::waypointsCallback(const as2_msgs::msg::TrajectoryWaypoints::SharedPtr _msg)

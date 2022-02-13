@@ -13,6 +13,8 @@
 
 #include "as2_msgs/srv/send_trajectory_waypoints.hpp"
 #include "as2_msgs/srv/set_speed.hpp"
+#include "tf2/transform_datatypes.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 
 #include "dynamic_trajectory_generator/dynamic_trajectory.hpp"
 #include "dynamic_trajectory_generator/dynamic_waypoint.hpp"

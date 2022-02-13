@@ -12,7 +12,21 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_subdirectory(subpackages/dynamic_trajectory_generator)
+# download the dynamic_trajectory_generator from github
+
+find_package(dynamic_trajectory_generator QUIET)
+if (${dynamic_trajectory_generator_FOUND})
+  MESSAGE(STATUS "dynamic_trajectory_generator found")
+else (${dynamic_trajectory_generator_FOUND})
+  MESSAGE(STATUS "dynamic_trajectory_generator not found")
+  include(FetchContent)
+  FetchContent_Declare(
+  dynamic_trajectory_generator
+  GIT_REPOSITORY https://github.com/miferco97/dynamic_trajectory_generator.git
+  GIT_TAG master
+  )
+  FetchContent_MakeAvailable(dynamic_trajectory_generator)
+endif(${dynamic_trajectory_generator_FOUND})
 
 # find dependencies
 set(PROJECT_DEPENDENCIES
@@ -29,6 +43,7 @@ set(PROJECT_DEPENDENCIES
 foreach(DEPENDENCY ${PROJECT_DEPENDENCIES})
   find_package(${DEPENDENCY} REQUIRED)
 endforeach()
+
 
 message("DYNAMIC_TRAJECTORY_GENERATOR_FOUND:")
 message("${dynamic_trajectory_generator_INCLUDE_DIRS}")

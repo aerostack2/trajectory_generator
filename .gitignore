@@ -5,3 +5,7 @@ log/
 logs/
 doxygen/
 subpackages/
+~/
+.cache/
+compile_commands.json
+
