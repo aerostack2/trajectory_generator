@@ -23,7 +23,7 @@ else (${dynamic_trajectory_generator_FOUND})
   FetchContent_Declare(
   dynamic_trajectory_generator
   GIT_REPOSITORY https://github.com/miferco97/dynamic_trajectory_generator.git
-  GIT_TAG master
+  GIT_TAG devel
   )
   FetchContent_MakeAvailable(dynamic_trajectory_generator)
 endif(${dynamic_trajectory_generator_FOUND})
@@ -38,6 +38,7 @@ set(PROJECT_DEPENDENCIES
   std_srvs
   trajectory_msgs
   geometry_msgs
+  # dynamic_trajectory_generator
 )
 
 foreach(DEPENDENCY ${PROJECT_DEPENDENCIES})

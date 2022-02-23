@@ -10,9 +10,9 @@ int main(int argc, char *argv[])
   node->preset_loop_frequency(50); // Node frequency for run and callbacks
   node->setup();
   // Node with only callbacks
-  as2::spinLoop(node);
+  // as2::spinLoop(node);
   // Node with run
-  // as2::spinLoop(node,std::bind(&As2NodeTemplate::run, node));
+  as2::spinLoop(node, std::bind(&As2TrajectoryGenerator::run, node));
 
   rclcpp::shutdown();
   return 0;
