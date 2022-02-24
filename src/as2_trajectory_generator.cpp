@@ -46,6 +46,8 @@ As2TrajectoryGenerator::As2TrajectoryGenerator()
   //     this->generate_global_name(PATH_DEBUG_TOPIC), 1);
   path_pub_ = this->create_publisher<nav_msgs::msg::Path>(
       PATH_DEBUG_TOPIC, 1);
+
+  frame_id_ = generateTfName(this->get_namespace(), "odom");
 }
 
 void As2TrajectoryGenerator::setup() {}

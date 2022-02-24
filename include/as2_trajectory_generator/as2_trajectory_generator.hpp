@@ -17,6 +17,7 @@
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 #include "trajectory_msgs/msg/joint_trajectory_point.hpp"
 #include "as2_core/utils.hpp"
+#include "as2_core/tf_utils.hpp"
 
 #define SET_WAYPOINTS_TOPIC "set_trajectory_waypoints"
 #define ADD_WAYPOINTS_TOPIC "add_trajectory_waypoints"
@@ -59,7 +60,7 @@ private:
   // as2_msgs::msg::TrajectoryWaypoints waypoints_msgs_;
 
   dynamic_traj_generator::DynamicTrajectory trajectory_generator_;
-  std::string frame_id_ = "drone_sim_11/odom"; // FIXME: ns/odom
+  std::string frame_id_;
   int yaw_mode_ = 0;
   float begin_traj_yaw_ = 0.0f;
   std::vector<double> v_positions_;
