@@ -11,6 +11,7 @@
 #include "dynamic_trajectory_generator/dynamic_trajectory.hpp"
 #include "dynamic_trajectory_generator/dynamic_waypoint.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "geometry_msgs/msg/point.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "tf2/transform_datatypes.h"
@@ -18,6 +19,7 @@
 #include "trajectory_msgs/msg/joint_trajectory_point.hpp"
 #include "as2_core/utils.hpp"
 #include "as2_core/tf_utils.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 
 #define SET_WAYPOINTS_TOPIC "set_trajectory_waypoints"
 #define ADD_WAYPOINTS_TOPIC "add_trajectory_waypoints"
@@ -27,6 +29,7 @@
 #define WAYPOINTS_TOPIC "motion_reference/waypoints"
 #define TRAJECTORY_TOPIC "motion_reference/trajectory"
 #define PATH_DEBUG_TOPIC "debug/traj_generated"
+#define REF_TRAJ_TOPIC "debug/ref_traj_point"
 
 class As2TrajectoryGenerator : public as2::Node
 {
@@ -48,6 +51,8 @@ private:
   /** Publishers **/
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectoryPoint>::SharedPtr trajectory_pub_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
+  // rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr ref_point_pub;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr ref_point_pub;
 
   // trajectory_msgs::msg::JointTrajectoryPoint trajectory_msg_;
 
@@ -96,6 +101,7 @@ private:
   /** Debug functions **/
   void plotTrajectory();
   void plotTrajectoryThread();
+  void plotRefTrajPoint();
 };
 
 /** Auxiliar Functions **/

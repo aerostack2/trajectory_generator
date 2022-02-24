@@ -1,6 +1,6 @@
 #include "as2_trajectory_generator.hpp"
 
-#include <nav_msgs/msg/detail/path__struct.hpp>
+// #include <nav_msgs/msg/detail/path__struct.hpp>
 #include <rclcpp/clock.hpp>
 
 As2TrajectoryGenerator::As2TrajectoryGenerator()
@@ -28,19 +28,24 @@ As2TrajectoryGenerator::As2TrajectoryGenerator()
                                  ));
 
   mod_waypoint_sub_ = this->create_subscription<as2_msgs::msg::PoseStampedWithID>(
-      MOD_WAYPOINTS_TOPIC, 1,
+      MOD_WAYPOINTS_TOPIC, 10,
       std::bind(&As2TrajectoryGenerator::modifyWaypointCallback, this, std::placeholders::_1));
 
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       ODOM_TOPIC, 1, std::bind(&As2TrajectoryGenerator::odomCallback, this, std::placeholders::_1));
 
   waypoints_sub_ = this->create_subscription<as2_msgs::msg::TrajectoryWaypoints>(
-      WAYPOINTS_TOPIC, 1, std::bind(&As2TrajectoryGenerator::waypointsCallback, this, std::placeholders::_1));
+      WAYPOINTS_TOPIC, 10, std::bind(&As2TrajectoryGenerator::waypointsCallback, this, std::placeholders::_1));
 
   // trajectory_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectoryPoint>(
   //     this->generate_global_name(TRAJECTORY_TOPIC), 10);
   trajectory_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectoryPoint>(
       TRAJECTORY_TOPIC, 10);
+
+  // ref_point_pub = this->create_publisher<geometry_msgs::msg::Point>(
+  //     REF_TRAJ_TOPIC, 1);
+  ref_point_pub = this->create_publisher<visualization_msgs::msg::Marker>(
+      REF_TRAJ_TOPIC, 1);
 
   // path_pub_ = this->create_publisher<nav_msgs::msg::Path>(
   //     this->generate_global_name(PATH_DEBUG_TOPIC), 1);
@@ -73,6 +78,8 @@ void As2TrajectoryGenerator::run()
       eval_time = rclcpp::Clock().now() - time_zero;
       publish_trajectory = evaluateTrajectory(eval_time.seconds());
     }
+
+    plotRefTrajPoint();
 
     if (publish_trajectory)
     {
@@ -356,6 +363,37 @@ void As2TrajectoryGenerator::plotTrajectoryThread()
 
   RCLCPP_INFO(this->get_logger(), "DEBUG: Plotting trajectory");
   path_pub_->publish(path_msg);
+}
+
+void As2TrajectoryGenerator::plotRefTrajPoint()
+{
+  visualization_msgs::msg::Marker point_msg;
+
+  point_msg.header.frame_id = frame_id_;
+  point_msg.header.stamp = rclcpp::Clock().now();
+  point_msg.type = visualization_msgs::msg::Marker::SPHERE;
+  point_msg.action = visualization_msgs::msg::Marker::ADD;
+
+  point_msg.color.r = 0.0f;
+  point_msg.color.g = 0.0f;
+  point_msg.color.b = 1.0f;
+  point_msg.color.a = 1.0f;
+
+  point_msg.scale.x = 0.2;
+  point_msg.scale.y = 0.2;
+  point_msg.scale.z = 0.2;
+
+  point_msg.pose.position.x = v_positions_[0];
+  point_msg.pose.position.y = v_positions_[1];
+  point_msg.pose.position.z = v_positions_[2];
+
+  // geometry_msgs::msg::Point point_msg;
+  // point_msg.x = v_positions_[0];
+  // point_msg.y = v_positions_[1];
+  // point_msg.z = v_positions_[2];
+
+  // RCLCPP_INFO(this->get_logger(), "DEBUG: Plotting trajectory reference point: %.2f,%.2f,%.2f", point_msg.pose.position.x, point_msg.pose.position.y, point_msg.pose.position.z);
+  ref_point_pub->publish(point_msg);
 }
 
 /*******************/

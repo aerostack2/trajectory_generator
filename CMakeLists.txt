@@ -38,6 +38,7 @@ set(PROJECT_DEPENDENCIES
   std_srvs
   trajectory_msgs
   geometry_msgs
+  visualization_msgs
   # dynamic_trajectory_generator
 )
 
