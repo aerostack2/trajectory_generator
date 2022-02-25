@@ -8,7 +8,7 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('drone_id', default_value='drone0'),
-        DeclareLaunchArgument('log_level', default_value='error'),
+        DeclareLaunchArgument('log_level', default_value='info'),
         Node(
             package='as2_trajectory_generator',
             executable='as2_trajectory_generator_node',
