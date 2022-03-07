@@ -23,10 +23,13 @@ else (${dynamic_trajectory_generator_FOUND})
   FetchContent_Declare(
   dynamic_trajectory_generator
   GIT_REPOSITORY https://github.com/miferco97/dynamic_trajectory_generator.git
-  GIT_TAG devel
+  GIT_TAG master
   )
   FetchContent_MakeAvailable(dynamic_trajectory_generator)
 endif(${dynamic_trajectory_generator_FOUND})
+
+#add_subdirectory(subpackages/dynamic_trajectory_generator)
+# find_package(dynamic_trajectory_generator)
 
 # find dependencies
 set(PROJECT_DEPENDENCIES
@@ -45,10 +48,6 @@ set(PROJECT_DEPENDENCIES
 foreach(DEPENDENCY ${PROJECT_DEPENDENCIES})
   find_package(${DEPENDENCY} REQUIRED)
 endforeach()
-
-
-message("DYNAMIC_TRAJECTORY_GENERATOR_FOUND:")
-message("${dynamic_trajectory_generator_INCLUDE_DIRS}")
 
 include_directories(
   include
@@ -75,5 +74,6 @@ install(DIRECTORY
 install(TARGETS
   ${PROJECT_NAME}_node
   DESTINATION lib/${PROJECT_NAME})
-    
+  
 ament_package()
+
