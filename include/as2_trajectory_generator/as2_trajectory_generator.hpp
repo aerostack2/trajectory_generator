@@ -52,7 +52,7 @@ private:
   rclcpp::Publisher<trajectory_msgs::msg::JointTrajectoryPoint>::SharedPtr trajectory_pub_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
   // rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr ref_point_pub;
-  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr ref_point_pub;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr ref_point_pub_;
 
   // trajectory_msgs::msg::JointTrajectoryPoint trajectory_msg_;
 

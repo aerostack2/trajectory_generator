@@ -44,7 +44,7 @@ As2TrajectoryGenerator::As2TrajectoryGenerator()
 
   // ref_point_pub = this->create_publisher<geometry_msgs::msg::Point>(
   //     REF_TRAJ_TOPIC, 1);
-  ref_point_pub = this->create_publisher<visualization_msgs::msg::Marker>(
+  ref_point_pub_ = this->create_publisher<visualization_msgs::msg::Marker>(
       REF_TRAJ_TOPIC, 1);
 
   // path_pub_ = this->create_publisher<nav_msgs::msg::Path>(
@@ -55,7 +55,10 @@ As2TrajectoryGenerator::As2TrajectoryGenerator()
   frame_id_ = generateTfName(this->get_namespace(), "odom");
 }
 
-void As2TrajectoryGenerator::setup() {}
+void As2TrajectoryGenerator::setup()
+{
+  // RCLCPP_INFO(this->get_logger(), "Waiting for odom callback");
+}
 
 void As2TrajectoryGenerator::run()
 {
@@ -64,30 +67,37 @@ void As2TrajectoryGenerator::run()
   static auto eval_time = time_zero - time_zero;
   static bool publish_trajectory = false;
 
-  if (evaluate_trajectory_ && has_odom_)
+  if (evaluate_trajectory_)
   {
-    if (first_time)
+    if (!has_odom_)
     {
-      publish_trajectory = evaluateTrajectory(0);
-      if (publish_trajectory)
-        first_time = false;
-      time_zero = rclcpp::Clock().now();
+      RCLCPP_WARN(this->get_logger(), "No odometry information available");
     }
     else
     {
-      eval_time = rclcpp::Clock().now() - time_zero;
-      publish_trajectory = evaluateTrajectory(eval_time.seconds());
-    }
-
-    plotRefTrajPoint();
-
-    if (publish_trajectory)
-    {
-      publishTrajectory();
-      if (trajectory_generator_.getWasTrajectoryRegenerated())
+      if (first_time)
       {
-        RCLCPP_INFO(this->get_logger(), "Plot trajectory");
-        plotTrajectory();
+        publish_trajectory = evaluateTrajectory(0);
+        if (publish_trajectory)
+          first_time = false;
+        time_zero = rclcpp::Clock().now();
+      }
+      else
+      {
+        eval_time = rclcpp::Clock().now() - time_zero;
+        publish_trajectory = evaluateTrajectory(eval_time.seconds());
+      }
+
+      plotRefTrajPoint();
+
+      if (publish_trajectory)
+      {
+        publishTrajectory();
+        if (trajectory_generator_.getWasTrajectoryRegenerated())
+        {
+          RCLCPP_INFO(this->get_logger(), "Plot trajectory");
+          plotTrajectory();
+        }
       }
     }
   }
@@ -118,17 +128,28 @@ bool As2TrajectoryGenerator::evaluateTrajectory(double _eval_time)
     // RCLCPP_INFO(this->get_logger(), "PATH_FACING");
     static float prev_vx = references_.velocity.x();
     static float prev_vy = references_.velocity.y();
-    if (fabs(references_.velocity.x()) > 0.01 || (references_.velocity.y()) > 0.01)
+    static bool yaw_fixed = false;
+    if (fabs(references_.velocity.x()) > 0.05 || (references_.velocity.y()) > 0.05)
     {
       v_positions_[3] =
           -atan2f((double)references_.velocity.x(), (double)references_.velocity.y()) +
           M_PI / 2.0f;
       prev_vx = references_.velocity.x();
       prev_vy = references_.velocity.y();
+      yaw_fixed = false;
     }
     else
     {
-      v_positions_[3] = -atan2f((double)prev_vx, (double)prev_vy) + M_PI / 2.0f;
+      static double yaw_desired = 0.0f;
+      if (!yaw_fixed)
+      {
+        yaw_desired = extractYawFromQuat(current_state_.pose.pose.orientation);
+        yaw_fixed = true;
+      }
+      // v_positions_[3] = -atan2f((double)prev_vx, (double)prev_vy) + M_PI / 2.0f;
+      // v_positions_[3] = -atan2f((double)references_.velocity.x(), (double)references_.velocity.y()) + M_PI / 2.0f;
+      // v_positions_[3] = begin_traj_yaw_;
+      v_positions_[3] = yaw_desired;
     }
   }
   break;
@@ -146,18 +167,12 @@ bool As2TrajectoryGenerator::evaluateTrajectory(double _eval_time)
   break;
   }
 
-  // RCLCPP_INFO(this->get_logger(), "ref z: %.3f", references_.position[2]);
   return publish_trajectory;
 }
 
 void As2TrajectoryGenerator::updateState()
 {
   Eigen::Vector3d current_position(current_state_.pose.pose.position.x, current_state_.pose.pose.position.y, current_state_.pose.pose.position.z);
-
-  // current_position.x() = current_state_.pose.pose.position.x;
-  // current_position.y() = current_state_.pose.pose.position.y;
-  // current_position.z() = current_state_.pose.pose.position.z;
-
   trajectory_generator_.updateVehiclePosition(current_position);
 }
 
@@ -195,11 +210,6 @@ void As2TrajectoryGenerator::setTrajectoryWaypointsSrvCall(
   yaw_mode_ = _request->waypoints.yaw_mode;
 
   waypoints_to_set.reserve(waypoints_msg.waypoints.poses.size());
-
-  // waypoints_to_set.reserve(waypoints_msg.waypoints.poses.size() + 1); // TODO: Remove +1
-  // dynamic_traj_generator::DynamicWaypoint current_state_point;
-  // generateDynamicPoint(current_state_, current_state_point);
-  // waypoints_to_set.emplace_back(current_state_point);
 
   for (auto waypoint : waypoints_msg.waypoints.poses)
   {
@@ -267,10 +277,9 @@ void As2TrajectoryGenerator::modifyWaypointCallback(
 
 void As2TrajectoryGenerator::odomCallback(const nav_msgs::msg::Odometry::SharedPtr _msg)
 {
-  // RCLCPP_INFO(this->get_logger(), "Odom callback working");
   if (!has_odom_)
   {
-    RCLCPP_INFO(this->get_logger(), "Odom callback working");
+    RCLCPP_WARN(this->get_logger(), "Odom callback working");
     has_odom_ = true;
   }
   current_state_ = *(_msg.get());
@@ -286,9 +295,6 @@ void As2TrajectoryGenerator::waypointsCallback(
 
   dynamic_traj_generator::DynamicWaypoint::Vector waypoints_to_set;
   waypoints_to_set.reserve(waypoints_msg.poses.size());
-  // dynamic_traj_generator::DynamicWaypoint current_state_point;
-  // generateDynamicPoint(current_state_, current_state_point);
-  // waypoints_to_set.emplace_back(current_state_point);
 
   float max_speed = waypoints_msg.max_speed;
   yaw_mode_ = waypoints_msg.yaw_mode;
@@ -387,13 +393,7 @@ void As2TrajectoryGenerator::plotRefTrajPoint()
   point_msg.pose.position.y = v_positions_[1];
   point_msg.pose.position.z = v_positions_[2];
 
-  // geometry_msgs::msg::Point point_msg;
-  // point_msg.x = v_positions_[0];
-  // point_msg.y = v_positions_[1];
-  // point_msg.z = v_positions_[2];
-
-  // RCLCPP_INFO(this->get_logger(), "DEBUG: Plotting trajectory reference point: %.2f,%.2f,%.2f", point_msg.pose.position.x, point_msg.pose.position.y, point_msg.pose.position.z);
-  ref_point_pub->publish(point_msg);
+  ref_point_pub_->publish(point_msg);
 }
 
 /*******************/
