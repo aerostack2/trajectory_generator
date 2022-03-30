@@ -4,6 +4,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include "as2_core/node.hpp"
+#include "as2_core/names/topics.hpp"
 #include "as2_msgs/msg/trajectory_waypoints.hpp"
 #include "as2_msgs/msg/trajectory_waypoints_with_id.hpp"
 #include "as2_msgs/srv/send_trajectory_waypoints.hpp"
@@ -25,9 +26,6 @@
 #define ADD_WAYPOINTS_TOPIC "add_trajectory_waypoints"
 #define MOD_WAYPOINTS_TOPIC "mod_trajectory_waypoints"
 #define SET_SPEED_TOPIC "set_speed"
-#define ODOM_TOPIC "self_localization/odom"
-#define WAYPOINTS_TOPIC "motion_reference/waypoints"
-#define TRAJECTORY_TOPIC "motion_reference/trajectory"
 #define PATH_DEBUG_TOPIC "debug/traj_generated"
 #define REF_TRAJ_TOPIC "debug/ref_traj_point"
 

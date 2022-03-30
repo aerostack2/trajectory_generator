@@ -32,15 +32,17 @@ As2TrajectoryGenerator::As2TrajectoryGenerator()
       std::bind(&As2TrajectoryGenerator::modifyWaypointCallback, this, std::placeholders::_1));
 
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      ODOM_TOPIC, 1, std::bind(&As2TrajectoryGenerator::odomCallback, this, std::placeholders::_1));
+      as2_names::topics::self_localization::odom, as2_names::topics::self_localization::qos, 
+      std::bind(&As2TrajectoryGenerator::odomCallback, this, std::placeholders::_1));
 
   waypoints_sub_ = this->create_subscription<as2_msgs::msg::TrajectoryWaypoints>(
-      WAYPOINTS_TOPIC, 10, std::bind(&As2TrajectoryGenerator::waypointsCallback, this, std::placeholders::_1));
+      as2_names::topics::motion_reference::wayp, as2_names::topics::motion_reference::qos_wp,
+      std::bind(&As2TrajectoryGenerator::waypointsCallback, this, std::placeholders::_1));
 
   // trajectory_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectoryPoint>(
   //     this->generate_global_name(TRAJECTORY_TOPIC), 10);
   trajectory_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectoryPoint>(
-      TRAJECTORY_TOPIC, 10);
+      as2_names::topics::motion_reference::trajectory, as2_names::topics::motion_reference::qos);
 
   // ref_point_pub = this->create_publisher<geometry_msgs::msg::Point>(
   //     REF_TRAJ_TOPIC, 1);
