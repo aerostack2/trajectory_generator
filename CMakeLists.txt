@@ -43,6 +43,7 @@ set(PROJECT_DEPENDENCIES
   geometry_msgs
   visualization_msgs
   # dynamic_trajectory_generator
+  as2_motion_command_handlers
 )
 
 foreach(DEPENDENCY ${PROJECT_DEPENDENCIES})

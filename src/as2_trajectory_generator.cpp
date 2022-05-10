@@ -7,7 +7,8 @@ As2TrajectoryGenerator::As2TrajectoryGenerator()
     : as2::Node("as2_trajectory_generator"),
       v_positions_(4),
       v_velocities_(4),
-      v_accelerations_(4)
+      v_accelerations_(4),
+      motion_handler(this)
 {
   set_trajectory_waypoints_srv_ = this->create_service<as2_msgs::srv::SendTrajectoryWaypoints>(
       SET_WAYPOINTS_TOPIC, std::bind(&As2TrajectoryGenerator::setTrajectoryWaypointsSrvCall, this,
@@ -38,11 +39,6 @@ As2TrajectoryGenerator::As2TrajectoryGenerator()
   waypoints_sub_ = this->create_subscription<as2_msgs::msg::TrajectoryWaypoints>(
       as2_names::topics::motion_reference::wayp, as2_names::topics::motion_reference::qos_wp,
       std::bind(&As2TrajectoryGenerator::waypointsCallback, this, std::placeholders::_1));
-
-  // trajectory_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectoryPoint>(
-  //     this->generate_global_name(TRAJECTORY_TOPIC), 10);
-  trajectory_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectoryPoint>(
-      as2_names::topics::motion_reference::trajectory, as2_names::topics::motion_reference::qos);
 
   // ref_point_pub = this->create_publisher<geometry_msgs::msg::Point>(
   //     REF_TRAJ_TOPIC, 1);
@@ -85,7 +81,7 @@ void As2TrajectoryGenerator::run()
 
     if (publish_trajectory)
     {
-      publishTrajectory();
+      motion_handler.sendTrajectoryCommandWithYawSpeed(v_positions_, v_velocities_, v_accelerations_);
       if (trajectory_generator_.getWasTrajectoryRegenerated())
       {
         RCLCPP_INFO(this->get_logger(), "Plot trajectory");
@@ -161,23 +157,6 @@ void As2TrajectoryGenerator::updateState()
   // current_position.z() = current_state_.pose.pose.position.z;
 
   trajectory_generator_.updateVehiclePosition(current_position);
-}
-
-/*******************/
-/** Topic Publish **/
-/*******************/
-
-void As2TrajectoryGenerator::publishTrajectory()
-{
-  trajectory_msgs::msg::JointTrajectoryPoint trajectoy_msg;
-
-  trajectoy_msg.positions = v_positions_;
-  trajectoy_msg.velocities = v_velocities_;
-  trajectoy_msg.accelerations = v_accelerations_;
-
-  // RCLCPP_INFO(this->get_logger(), "Publishing trajectory generated");
-  trajectory_pub_->publish(trajectoy_msg);
-  // RCLCPP_INFO(this->get_logger(), "Trajectory published successfully");
 }
 
 /************************/

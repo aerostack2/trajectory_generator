@@ -21,6 +21,7 @@
 #include "as2_core/utils.hpp"
 #include "as2_core/tf_utils.hpp"
 #include "visualization_msgs/msg/marker.hpp"
+#include "as2_motion_command_handlers/trajectory_motion.hpp"
 
 #define SET_WAYPOINTS_TOPIC "set_trajectory_waypoints"
 #define ADD_WAYPOINTS_TOPIC "add_trajectory_waypoints"
@@ -46,8 +47,9 @@ private:
   rclcpp::Subscription<as2_msgs::msg::PoseStampedWithID>::SharedPtr mod_waypoint_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<as2_msgs::msg::TrajectoryWaypoints>::SharedPtr waypoints_sub_;
-  /** Publishers **/
-  rclcpp::Publisher<trajectory_msgs::msg::JointTrajectoryPoint>::SharedPtr trajectory_pub_;
+  /** Motion Handler **/
+  as2::motionCommandsHandlers::TrajectoryMotion motion_handler;
+
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
   // rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr ref_point_pub;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr ref_point_pub;
