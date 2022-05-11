@@ -74,7 +74,13 @@ void As2TrajectoryGenerator::run()
     else
     {
       eval_time = rclcpp::Clock().now() - time_zero;
+      if (trajectory_generator_.getMaxTime() < eval_time.seconds() + 0.2)
+      {
       publish_trajectory = evaluateTrajectory(eval_time.seconds());
+      }
+      else{
+        publish_trajectory = false;
+      }
     }
 
     plotRefTrajPoint();
