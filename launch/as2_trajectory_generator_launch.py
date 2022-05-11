@@ -12,7 +12,6 @@ def generate_launch_description():
         Node(
             package='as2_trajectory_generator',
             executable='as2_trajectory_generator_node',
-            name='as2_trajectory_generator',
             namespace=LaunchConfiguration('drone_id'),
             output='screen',
             arguments=['--ros-args', '--log-level',
