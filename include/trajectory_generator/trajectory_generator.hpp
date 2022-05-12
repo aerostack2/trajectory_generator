@@ -44,7 +44,7 @@
 #include "as2_core/names/topics.hpp"
 #include "as2_core/names/services.hpp"
 #include "as2_core/tf_utils.hpp"
-#include "as2_motion_command_handlers/trajectory_motion.hpp"
+#include "motion_reference_handlers/trajectory_motion.hpp"
 
 #include "as2_msgs/msg/trajectory_waypoints.hpp"
 #include "as2_msgs/msg/trajectory_waypoints_with_id.hpp"
@@ -86,7 +86,7 @@ private:
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr ref_point_pub;
   /** Motion Handler **/
-  as2::motionCommandsHandlers::TrajectoryMotion motion_handler;
+  as2::motionReferenceHandlers::TrajectoryMotion motion_handler;
 
   bool evaluate_trajectory_ = false;
   bool has_odom_ = false;
