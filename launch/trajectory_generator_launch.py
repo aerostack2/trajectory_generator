@@ -1,4 +1,3 @@
-from ast import arguments
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
@@ -10,8 +9,9 @@ def generate_launch_description():
         DeclareLaunchArgument('drone_id', default_value='drone0'),
         DeclareLaunchArgument('log_level', default_value='info'),
         Node(
-            package='as2_trajectory_generator',
-            executable='as2_trajectory_generator_node',
+            package='trajectory_generator',
+            executable='trajectory_generator_node',
+            name='trajectory_generator',
             namespace=LaunchConfiguration('drone_id'),
             output='screen',
             arguments=['--ros-args', '--log-level',
