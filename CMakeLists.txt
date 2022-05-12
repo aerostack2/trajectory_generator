@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
-set(PROJECT_NAME trajectory_generator)
-project(${PROJECT_NAME} VERSION 0.1.0)
+set(PROJECT_NAME as2_trajectory_generator)
+project(${PROJECT_NAME})
 
-# Default to C++17
+# Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif()
@@ -12,10 +12,8 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-#set fPIC to ON by default
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
 # download the dynamic_trajectory_generator from github
+
 find_package(dynamic_trajectory_generator QUIET)
 if (${dynamic_trajectory_generator_FOUND})
   MESSAGE(STATUS "dynamic_trajectory_generator found")
@@ -44,12 +42,9 @@ set(PROJECT_DEPENDENCIES
   trajectory_msgs
   geometry_msgs
   visualization_msgs
-<<<<<<< HEAD
   # dynamic_trajectory_generator
   yaml-cpp
   as2_motion_command_handlers
-=======
->>>>>>> origin/demo_upm
 )
 
 foreach(DEPENDENCY ${PROJECT_DEPENDENCIES})
@@ -62,20 +57,15 @@ include_directories(
 )
 
 set(SOURCE_CPP_FILES 
-  src/trajectory_generator.cpp
+  src/as2_trajectory_generator.cpp
 )
 
-<<<<<<< HEAD
 # set(INCLUDE_HPP_FILES 
 #   include/${PROJECT_NAME}/as2_trajectory_generator_libs.hpp
 # )
 
 add_executable(${PROJECT_NAME}_node src/as2_trajectory_generator_node.cpp ${SOURCE_CPP_FILES})
 target_link_libraries(${PROJECT_NAME}_node dynamic_trajectory_generator yaml-cpp)
-=======
-add_executable(${PROJECT_NAME}_node src/trajectory_generator_node.cpp ${SOURCE_CPP_FILES})
-target_link_libraries(${PROJECT_NAME}_node dynamic_trajectory_generator) # link with dynamic_trajectory_generator
->>>>>>> origin/demo_upm
 ament_target_dependencies(${PROJECT_NAME}_node ${PROJECT_DEPENDENCIES})
 
 
