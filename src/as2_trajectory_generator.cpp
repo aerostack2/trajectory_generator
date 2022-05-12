@@ -1,6 +1,8 @@
 #include "as2_trajectory_generator.hpp"
 
 // #include <nav_msgs/msg/detail/path__struct.hpp>
+#include <as2_core/names/services.hpp>
+#include <as2_core/names/topics.hpp>
 #include <rclcpp/clock.hpp>
 
 As2TrajectoryGenerator::As2TrajectoryGenerator()
@@ -11,34 +13,34 @@ As2TrajectoryGenerator::As2TrajectoryGenerator()
       motion_handler(this)
 {
   set_trajectory_waypoints_srv_ = this->create_service<as2_msgs::srv::SendTrajectoryWaypoints>(
-      SET_WAYPOINTS_TOPIC, std::bind(&As2TrajectoryGenerator::setTrajectoryWaypointsSrvCall, this,
+      as2_names::services::motion_reference::send_traj_wayp, std::bind(&As2TrajectoryGenerator::setTrajectoryWaypointsSrvCall, this,
                                      std::placeholders::_1, // Corresponds to the 'request'  input
                                      std::placeholders::_2  // Corresponds to the 'response' input
                                      ));
 
   add_trajectory_waypoints_srv_ = this->create_service<as2_msgs::srv::SendTrajectoryWaypoints>(
-      ADD_WAYPOINTS_TOPIC, std::bind(&As2TrajectoryGenerator::addTrajectoryWaypointsSrvCall, this,
+      as2_names::services::motion_reference::add_traj_wayp, std::bind(&As2TrajectoryGenerator::addTrajectoryWaypointsSrvCall, this,
                                      std::placeholders::_1, // Corresponds to the 'request'  input
                                      std::placeholders::_2  // Corresponds to the 'response' input
                                      ));
 
   set_speed_srv_ = this->create_service<as2_msgs::srv::SetSpeed>(
-      SET_SPEED_TOPIC, std::bind(&As2TrajectoryGenerator::setSpeedSrvCall, this,
+      as2_names::services::motion_reference::set_traj_speed, std::bind(&As2TrajectoryGenerator::setSpeedSrvCall, this,
                                  std::placeholders::_1, // Corresponds to the 'request'  input
                                  std::placeholders::_2  // Corresponds to the 'response' input
                                  ));
 
   mod_waypoint_sub_ = this->create_subscription<as2_msgs::msg::PoseStampedWithID>(
-      MOD_WAYPOINTS_TOPIC, 10,
+      as2_names::topics::motion_reference::modify_waypoint, as2_names::topics::motion_reference::qos_waypoint ,
       std::bind(&As2TrajectoryGenerator::modifyWaypointCallback, this, std::placeholders::_1));
 
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
       as2_names::topics::self_localization::odom, as2_names::topics::self_localization::qos, 
       std::bind(&As2TrajectoryGenerator::odomCallback, this, std::placeholders::_1));
 
-  waypoints_sub_ = this->create_subscription<as2_msgs::msg::TrajectoryWaypoints>(
-      as2_names::topics::motion_reference::wayp, as2_names::topics::motion_reference::qos_wp,
-      std::bind(&As2TrajectoryGenerator::waypointsCallback, this, std::placeholders::_1));
+  // waypoints_sub_ = this->create_subscription<as2_msgs::msg::TrajectoryWaypoints>(
+  //     as2_names::topics::motion_reference::wayp, as2_names::topics::motion_reference::qos_wp,
+  //     std::bind(&As2TrajectoryGenerator::waypointsCallback, this, std::placeholders::_1));
 
   // ref_point_pub = this->create_publisher<geometry_msgs::msg::Point>(
   //     REF_TRAJ_TOPIC, 1);

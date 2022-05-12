@@ -43,6 +43,7 @@ set(PROJECT_DEPENDENCIES
   geometry_msgs
   visualization_msgs
   # dynamic_trajectory_generator
+  yaml-cpp
   as2_motion_command_handlers
 )
 
@@ -64,7 +65,7 @@ set(SOURCE_CPP_FILES
 # )
 
 add_executable(${PROJECT_NAME}_node src/as2_trajectory_generator_node.cpp ${SOURCE_CPP_FILES})
-target_link_libraries(${PROJECT_NAME}_node dynamic_trajectory_generator)
+target_link_libraries(${PROJECT_NAME}_node dynamic_trajectory_generator yaml-cpp)
 ament_target_dependencies(${PROJECT_NAME}_node ${PROJECT_DEPENDENCIES})
 
 

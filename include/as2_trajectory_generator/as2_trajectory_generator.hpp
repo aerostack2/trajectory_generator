@@ -5,6 +5,7 @@
 
 #include "as2_core/node.hpp"
 #include "as2_core/names/topics.hpp"
+#include "as2_core/names/services.hpp"
 #include "as2_msgs/msg/trajectory_waypoints.hpp"
 #include "as2_msgs/msg/trajectory_waypoints_with_id.hpp"
 #include "as2_msgs/srv/send_trajectory_waypoints.hpp"
