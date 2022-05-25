@@ -108,12 +108,14 @@ void TrajectoryGenerator::run()
   else
   {
     eval_time = rclcpp::Clock().now() - time_zero;
+    
     if (trajectory_generator_.getMaxTime() + 0.2 > eval_time.seconds())
     {
       publish_trajectory = evaluateTrajectory(eval_time.seconds());
     }
     else
     {
+      evaluateTrajectory(eval_time.seconds());
       publish_trajectory = false;
     }
   }
