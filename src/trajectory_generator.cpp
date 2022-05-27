@@ -165,7 +165,7 @@ bool TrajectoryGenerator::evaluateTrajectory(double _eval_time)
     }
     else
     {
-      v_positions_[3] = -atan2f((double)prev_vx, (double)prev_vy);
+      v_positions_[3] = atan2f((double)prev_vy, (double)prev_vx);
     }
   }
   break;
