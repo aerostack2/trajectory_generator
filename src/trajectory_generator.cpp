@@ -149,9 +149,7 @@ bool TrajectoryGenerator::evaluateTrajectory(double _eval_time)
   {
   case as2_msgs::msg::TrajectoryWaypoints::KEEP_YAW:
   {
-    v_positions_[3] =
-        begin_traj_yaw_ + M_PI / 2.0f; // FIXME: This is a hack to make the robot start
-                                       //        facing the correct direction
+    v_positions_[3] = begin_traj_yaw_;
   }
   break;
   case as2_msgs::msg::TrajectoryWaypoints::PATH_FACING:
@@ -161,14 +159,13 @@ bool TrajectoryGenerator::evaluateTrajectory(double _eval_time)
     if (fabs(references_.velocity.x()) > 0.01 || (references_.velocity.y()) > 0.01)
     {
       v_positions_[3] =
-          -atan2f((double)references_.velocity.x(), (double)references_.velocity.y()) +
-          M_PI / 2.0f;
+         atan2f((double)references_.velocity.y(), (double)references_.velocity.x());
       prev_vx = references_.velocity.x();
       prev_vy = references_.velocity.y();
     }
     else
     {
-      v_positions_[3] = -atan2f((double)prev_vx, (double)prev_vy) + M_PI / 2.0f;
+      v_positions_[3] = -atan2f((double)prev_vx, (double)prev_vy);
     }
   }
   break;
