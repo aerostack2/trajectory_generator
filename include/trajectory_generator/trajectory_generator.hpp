@@ -45,6 +45,12 @@
 #include "as2_core/names/services.hpp"
 #include "as2_core/tf_utils.hpp"
 #include "motion_reference_handlers/trajectory_motion.hpp"
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/twist_stamped.hpp>
+
 
 #include "as2_msgs/msg/trajectory_waypoints.hpp"
 #include "as2_msgs/msg/trajectory_waypoints_with_id.hpp"
@@ -79,8 +85,12 @@ private:
   rclcpp::Service<as2_msgs::srv::SendTrajectoryWaypoints>::SharedPtr add_trajectory_waypoints_srv_;
   rclcpp::Service<as2_msgs::srv::SetSpeed>::SharedPtr set_speed_srv_;
   /** Subscriptions **/
+  std::shared_ptr<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>> pose_sub_;
+  std::shared_ptr<message_filters::Subscriber<geometry_msgs::msg::TwistStamped>> twist_sub_;
+  typedef message_filters::sync_policies::ApproximateTime<geometry_msgs::msg::PoseStamped, geometry_msgs::msg::TwistStamped> approximate_policy;
+  std::shared_ptr<message_filters::Synchronizer<approximate_policy>> synchronizer_;
+
   rclcpp::Subscription<as2_msgs::msg::PoseStampedWithID>::SharedPtr mod_waypoint_sub_;
-  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<as2_msgs::msg::TrajectoryWaypoints>::SharedPtr waypoints_sub_;
   /** Publishers **/
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
@@ -100,7 +110,9 @@ private:
   std::vector<double> v_accelerations_;
 
   dynamic_traj_generator::References references_;
-  nav_msgs::msg::Odometry current_state_;
+  geometry_msgs::msg::PoseStamped current_state_pose_;
+  geometry_msgs::msg::TwistStamped current_state_twist_;
+
 
   std::thread plot_thread_;
 
@@ -121,7 +133,8 @@ private:
                        std::shared_ptr<as2_msgs::srv::SetSpeed::Response> _response);
   /** Topic Callbacks **/
   void modifyWaypointCallback(const as2_msgs::msg::PoseStampedWithID::SharedPtr _msg);
-  void odomCallback(const nav_msgs::msg::Odometry::SharedPtr _msg);
+  void state_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr pose_msg,
+                      const geometry_msgs::msg::TwistStamped::ConstSharedPtr twist_msg);
   void waypointsCallback(const as2_msgs::msg::TrajectoryWaypoints::SharedPtr _msg);
 
   /** Debug functions **/

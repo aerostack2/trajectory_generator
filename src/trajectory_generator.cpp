@@ -69,9 +69,10 @@ TrajectoryGenerator::TrajectoryGenerator()
       as2_names::topics::motion_reference::qos_waypoint,
       std::bind(&TrajectoryGenerator::modifyWaypointCallback, this, std::placeholders::_1));
 
-  odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      as2_names::topics::self_localization::odom, as2_names::topics::self_localization::qos,
-      std::bind(&TrajectoryGenerator::odomCallback, this, std::placeholders::_1));
+  pose_sub_ = std::make_shared<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>>(this, as2_names::topics::self_localization::pose, as2_names::topics::self_localization::qos.get_rmw_qos_profile());
+  twist_sub_ = std::make_shared<message_filters::Subscriber<geometry_msgs::msg::TwistStamped>>(this, as2_names::topics::self_localization::twist, as2_names::topics::self_localization::qos.get_rmw_qos_profile());
+  synchronizer_ = std::make_shared<message_filters::Synchronizer<approximate_policy>>(approximate_policy(5), *(pose_sub_.get()), *(twist_sub_.get()));
+  synchronizer_->registerCallback(&TrajectoryGenerator::state_callback, this);
 
   ref_point_pub = this->create_publisher<visualization_msgs::msg::Marker>(REF_TRAJ_TOPIC, 1);
 
@@ -108,7 +109,7 @@ void TrajectoryGenerator::run()
   else
   {
     eval_time = rclcpp::Clock().now() - time_zero;
-    
+
     if (trajectory_generator_.getMaxTime() + 0.2 > eval_time.seconds())
     {
       publish_trajectory = evaluateTrajectory(eval_time.seconds());
@@ -159,7 +160,7 @@ bool TrajectoryGenerator::evaluateTrajectory(double _eval_time)
     if (fabs(references_.velocity.x()) > 0.01 || (references_.velocity.y()) > 0.01)
     {
       v_positions_[3] =
-         atan2f((double)references_.velocity.y(), (double)references_.velocity.x());
+          atan2f((double)references_.velocity.y(), (double)references_.velocity.x());
       prev_vx = references_.velocity.x();
       prev_vy = references_.velocity.y();
     }
@@ -188,9 +189,9 @@ bool TrajectoryGenerator::evaluateTrajectory(double _eval_time)
 
 void TrajectoryGenerator::updateState()
 {
-  Eigen::Vector3d current_position(current_state_.pose.pose.position.x,
-                                   current_state_.pose.pose.position.y,
-                                   current_state_.pose.pose.position.z);
+  Eigen::Vector3d current_position(current_state_pose_.pose.position.x,
+                                   current_state_pose_.pose.position.y,
+                                   current_state_pose_.pose.position.z);
   trajectory_generator_.updateVehiclePosition(current_position);
 }
 
@@ -218,7 +219,7 @@ void TrajectoryGenerator::setTrajectoryWaypointsSrvCall(
     waypoints_to_set.emplace_back(dynamic_waypoint);
   }
 
-  begin_traj_yaw_ = extractYawFromQuat(current_state_.pose.pose.orientation);
+  begin_traj_yaw_ = extractYawFromQuat(current_state_pose_.pose.orientation);
   trajectory_generator_.setWaypoints(waypoints_to_set);
   evaluate_trajectory_ = true;
 }
@@ -277,17 +278,21 @@ void TrajectoryGenerator::modifyWaypointCallback(
   trajectory_generator_.modifyWaypoint(_msg->id, position);
 }
 
-void TrajectoryGenerator::odomCallback(const nav_msgs::msg::Odometry::SharedPtr _msg)
+// TODO: if onExecute is done with timer no atomic attributes needed
+void TrajectoryGenerator::state_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr pose_msg,
+                    const geometry_msgs::msg::TwistStamped::ConstSharedPtr twist_msg)
 {
   if (!has_odom_)
   {
-    RCLCPP_INFO(this->get_logger(), "Odom callback working");
+    RCLCPP_INFO(this->get_logger(), "State callback working");
     has_odom_ = true;
   }
-  current_state_ = *(_msg.get());
+
+  current_state_pose_ = *(pose_msg.get());
+  current_state_twist_ = *(twist_msg.get());
 
   updateState();
-}
+};
 
 void TrajectoryGenerator::waypointsCallback(
     const as2_msgs::msg::TrajectoryWaypoints::SharedPtr _msg)
