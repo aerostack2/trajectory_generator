@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 set(PROJECT_NAME trajectory_generator)
-project(${PROJECT_NAME} VERSION 0.1.0)
+project(${PROJECT_NAME} VERSION 0.2.0)
 
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)
@@ -15,7 +15,7 @@ endif()
 #set fPIC to ON by default
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# download the dynamic_trajectory_generator from github
+#download the dynamic_trajectory_generator from github
 find_package(dynamic_trajectory_generator QUIET)
 if (${dynamic_trajectory_generator_FOUND})
   MESSAGE(STATUS "dynamic_trajectory_generator found")
@@ -30,6 +30,7 @@ else (${dynamic_trajectory_generator_FOUND})
   FetchContent_MakeAvailable(dynamic_trajectory_generator)
 endif(${dynamic_trajectory_generator_FOUND})
 
+# add_subdirectory(subpackages/dynamic_trajectory_generator)
 # find dependencies
 set(PROJECT_DEPENDENCIES
   ament_cmake
