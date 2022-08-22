@@ -14,8 +14,8 @@ def generate_launch_description():
             namespace=LaunchConfiguration('drone_id'),
             output='screen',
             arguments=['--ros-args', '--log-level',
-                       LaunchConfiguration('log_level'),
-                       {"use_sim_time": LaunchConfiguration('use_sim_time')}],
+                       LaunchConfiguration('log_level')],
+            parameters=[{"use_sim_time": LaunchConfiguration('use_sim_time')}],
             emulate_tty=True
         )
     ])
