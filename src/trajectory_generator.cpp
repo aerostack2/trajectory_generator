@@ -36,6 +36,8 @@
 
 #include "trajectory_generator.hpp"
 
+#include <rclcpp/qos.hpp>
+
 TrajectoryGenerator::TrajectoryGenerator()
     : as2::Node("trajectory_generator"),
       v_positions_(4),
@@ -74,6 +76,10 @@ TrajectoryGenerator::TrajectoryGenerator()
       as2_names::topics::motion_reference::modify_waypoint, as2_names::topics::motion_reference::qos_waypoint,
       std::bind(&TrajectoryGenerator::modifyWaypointCallback, this, std::placeholders::_1));
 
+  yaw_sub_ = this->create_subscription<std_msgs::msg::Float32>(
+      "traj_gen/yaw", rclcpp::SensorDataQoS(),
+      std::bind(&TrajectoryGenerator::yawCallback, this, std::placeholders::_1));
+
   pose_sub_ = std::make_shared<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>>(
       this, as2_names::topics::self_localization::pose,
       as2_names::topics::self_localization::qos.get_rmw_qos_profile());
@@ -93,12 +99,16 @@ TrajectoryGenerator::TrajectoryGenerator()
 
 void TrajectoryGenerator::setup() {
   trajectory_generator_ = std::make_shared<dynamic_traj_generator::DynamicTrajectory>();
+  has_yaw_from_topic_ = false;
   first_time_ = true;
   time_zero_ = this->now();
   eval_time_ = time_zero_ - time_zero_;
   publish_trajectory_ = false;
   evaluate_trajectory_ = false;
   has_odom_ = false;
+  has_prev_v_ = false;
+  prev_vx_ = 0.0;
+  prev_vy_ = 0.0;
   yaw_mode_ = 0;
   begin_traj_yaw_ = 0.0f;
   v_positions_ = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -160,19 +170,29 @@ bool TrajectoryGenerator::evaluateTrajectory(double _eval_time) {
       v_positions_[3] = begin_traj_yaw_;
     } break;
     case as2_msgs::msg::TrajectoryWaypoints::PATH_FACING: {
-      static float prev_vx = references_.velocity.x();
-      static float prev_vy = references_.velocity.y();
+      if (!has_prev_v_) {
+        prev_vx_ = references_.velocity.x();
+        prev_vy_ = references_.velocity.y();
+        has_prev_v_ = true;
+      }
       if (fabs(references_.velocity.x()) > 0.01 || (references_.velocity.y()) > 0.01) {
         v_positions_[3] = atan2f((double)references_.velocity.y(), (double)references_.velocity.x());
-        prev_vx = references_.velocity.x();
-        prev_vy = references_.velocity.y();
+        prev_vx_ = references_.velocity.x();
+        prev_vy_ = references_.velocity.y();
       } else {
-        v_positions_[3] = atan2f((double)prev_vy, (double)prev_vx);
+        v_positions_[3] = atan2f((double)prev_vy_, (double)prev_vx_);
       }
     } break;
     case as2_msgs::msg::TrajectoryWaypoints::GENERATE_YAW_TRAJ: {
       v_positions_[3] = 0.0f;
       std::cerr << "YAW MODE NOT IMPLEMENTED YET" << std::endl;
+    } break;
+    case as2_msgs::msg::TrajectoryWaypoints::YAW_FROM_TOPIC: {
+      if (has_yaw_from_topic_) {
+        v_positions_[3] = yaw_from_topic_;
+      } else {
+        v_positions_[3] = begin_traj_yaw_;
+      }
     } break;
 
     default: {

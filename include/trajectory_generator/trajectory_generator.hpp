@@ -62,6 +62,7 @@
 #include "motion_reference_handlers/trajectory_motion.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "nav_msgs/msg/path.hpp"
+#include "std_msgs/msg/float32.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 #include "trajectory_msgs/msg/joint_trajectory_point.hpp"
 #include "visualization_msgs/msg/marker.hpp"
@@ -94,6 +95,7 @@ class TrajectoryGenerator : public as2::Node {
 
   rclcpp::Subscription<as2_msgs::msg::PoseStampedWithID>::SharedPtr mod_waypoint_sub_;
   rclcpp::Subscription<as2_msgs::msg::TrajectoryWaypoints>::SharedPtr waypoints_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr yaw_sub_;
   /** Publishers **/
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr ref_point_pub;
@@ -116,6 +118,10 @@ class TrajectoryGenerator : public as2::Node {
   dynamic_traj_generator::References references_;
   geometry_msgs::msg::PoseStamped current_state_pose_;
   geometry_msgs::msg::TwistStamped current_state_twist_;
+
+  float prev_vx_ = references_.velocity.x();
+  float prev_vy_ = references_.velocity.y();
+  bool has_prev_v_ = false;
 
   std::thread plot_thread_;
 
@@ -146,6 +152,15 @@ class TrajectoryGenerator : public as2::Node {
                       const geometry_msgs::msg::TwistStamped::ConstSharedPtr twist_msg);
   void waypointsCallback(const as2_msgs::msg::TrajectoryWaypoints::SharedPtr _msg);
 
+  void yawCallback(const std_msgs::msg::Float32::SharedPtr _msg){
+    has_yaw_from_topic_ = true;
+    yaw_from_topic_ = _msg->data;
+  };
+
+  bool has_yaw_from_topic_ = false;
+  float yaw_from_topic_ = 0.0f;
+
+  
   /** Debug functions **/
   void plotTrajectory();
   void plotTrajectoryThread();
