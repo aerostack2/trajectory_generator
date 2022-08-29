@@ -71,14 +71,15 @@
 #define PATH_DEBUG_TOPIC "debug/traj_generated"
 #define REF_TRAJ_TOPIC "debug/ref_traj_point"
 
-class TrajectoryGenerator : public as2::Node {
-  public:
+class TrajectoryGenerator : public as2::Node
+{
+public:
   TrajectoryGenerator();
   ~TrajectoryGenerator(){};
   void setup();
   void run();
 
-  private:
+private:
   /** Services **/
   rclcpp::Service<as2_msgs::srv::SendTrajectoryWaypoints>::SharedPtr set_trajectory_waypoints_srv_;
   rclcpp::Service<as2_msgs::srv::SendTrajectoryWaypoints>::SharedPtr add_trajectory_waypoints_srv_;
@@ -152,21 +153,19 @@ class TrajectoryGenerator : public as2::Node {
                       const geometry_msgs::msg::TwistStamped::ConstSharedPtr twist_msg);
   void waypointsCallback(const as2_msgs::msg::TrajectoryWaypoints::SharedPtr _msg);
 
-  void yawCallback(const std_msgs::msg::Float32::SharedPtr _msg){
-    has_yaw_from_topic_ = true;
-    yaw_from_topic_ = _msg->data;
-  };
+  void yawCallback(const std_msgs::msg::Float32::SharedPtr _msg);
 
   bool has_yaw_from_topic_ = false;
   float yaw_from_topic_ = 0.0f;
 
-  
   /** Debug functions **/
   void plotTrajectory();
   void plotTrajectoryThread();
   void plotRefTrajPoint();
-  void stop() {
-    if (plot_thread_.joinable()) {
+  void stop()
+  {
+    if (plot_thread_.joinable())
+    {
       plot_thread_.join();
       RCLCPP_INFO(this->get_logger(), "Plot thread joined");
     }
@@ -184,4 +183,4 @@ void generateDynamicPoint(const geometry_msgs::msg::PoseStamped &msg,
                           dynamic_traj_generator::DynamicWaypoint &dynamic_point);
 void generateDynamicPoint(const nav_msgs::msg::Odometry &msg, dynamic_traj_generator::DynamicWaypoint &dynamic_point);
 
-#endif  // TRAJECTORY_GENERATOR_HPP_
+#endif // TRAJECTORY_GENERATOR_HPP_
