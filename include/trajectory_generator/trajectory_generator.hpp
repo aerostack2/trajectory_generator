@@ -55,6 +55,7 @@
 #include "as2_msgs/msg/trajectory_waypoints_with_id.hpp"
 #include "as2_msgs/srv/send_trajectory_waypoints.hpp"
 #include "as2_msgs/srv/set_speed.hpp"
+#include "as2_msgs/msg/traj_gen_info.hpp"
 #include "dynamic_trajectory_generator/dynamic_trajectory.hpp"
 #include "dynamic_trajectory_generator/dynamic_waypoint.hpp"
 #include "geometry_msgs/msg/point.hpp"
@@ -100,6 +101,7 @@ private:
   /** Publishers **/
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr ref_point_pub;
+  rclcpp::Publisher<as2_msgs::msg::TrajGenInfo>::SharedPtr traj_gen_info_pub_;
   /** Motion Handler **/
   as2::motionReferenceHandlers::TrajectoryMotion motion_handler;
 
@@ -119,6 +121,8 @@ private:
   dynamic_traj_generator::References references_;
   geometry_msgs::msg::PoseStamped current_state_pose_;
   geometry_msgs::msg::TwistStamped current_state_twist_;
+  as2_msgs::msg::TrajGenInfo traj_gen_info_msg_;
+
 
   float prev_vx_ = references_.velocity.x();
   float prev_vy_ = references_.velocity.y();
@@ -162,6 +166,7 @@ private:
   void plotTrajectory();
   void plotTrajectoryThread();
   void plotRefTrajPoint();
+  void publishTrajGenInfo();
   void stop()
   {
     if (plot_thread_.joinable())
@@ -170,6 +175,7 @@ private:
       RCLCPP_INFO(this->get_logger(), "Plot thread joined");
     }
     trajectory_generator_.reset();
+    traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::STOPPED;
     RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator stopped");
   };
 };

@@ -95,7 +95,20 @@ TrajectoryGenerator::TrajectoryGenerator()
 
   path_pub_ = this->create_publisher<nav_msgs::msg::Path>(PATH_DEBUG_TOPIC, 1);
 
+  traj_gen_info_pub_ = this->create_publisher<as2_msgs::msg::TrajGenInfo>(
+      as2_names::topics::motion_reference::traj_gen_info, 1);
+
+  static auto info_timer = this->create_wall_timer(
+      std::chrono::milliseconds(100), std::bind(&TrajectoryGenerator::publishTrajGenInfo, this));
+
   frame_id_ = generateTfName(this->get_namespace(), "odom");
+  traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::WAITING;
+}
+
+void TrajectoryGenerator::publishTrajGenInfo(){
+  traj_gen_info_msg_.header.stamp = this->now();
+  traj_gen_info_msg_.node_status.status = as2_msgs::msg::NodeStatus::ACTIVE;
+  traj_gen_info_pub_->publish(traj_gen_info_msg_);
 }
 
 void TrajectoryGenerator::setup()
@@ -116,6 +129,7 @@ void TrajectoryGenerator::setup()
   v_positions_ = {0.0f, 0.0f, 0.0f, 0.0f};
   v_velocities_ = {0.0f, 0.0f, 0.0f, 0.0f};
   v_accelerations_ = {0.0f, 0.0f, 0.0f, 0.0f};
+  traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::WAITING;
 }
 
 void TrajectoryGenerator::run()
@@ -147,10 +161,12 @@ void TrajectoryGenerator::run()
 
     if (trajectory_generator_->getMaxTime() + 0.2 > eval_time_.seconds())
     {
+      traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::EVALUATING;
       publish_trajectory_ = evaluateTrajectory(eval_time_.seconds());
     }
     else
     {
+      traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::WAITING;
       evaluateTrajectory(eval_time_.seconds());
       publish_trajectory_ = false;
     }
