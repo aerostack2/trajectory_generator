@@ -102,7 +102,7 @@ TrajectoryGenerator::TrajectoryGenerator()
       std::chrono::milliseconds(100), std::bind(&TrajectoryGenerator::publishTrajGenInfo, this));
 
   frame_id_ = generateTfName(this->get_namespace(), "odom");
-  traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::WAITING;
+  traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::STOPPED;
 }
 
 void TrajectoryGenerator::publishTrajGenInfo(){
@@ -356,6 +356,11 @@ void TrajectoryGenerator::runNodeSrvCall(const std::shared_ptr<std_srvs::srv::Se
 {
   if (_request->data)
   {
+    if (traj_gen_info_msg_.active_status != as2_msgs::msg::TrajGenInfo::STOPPED){
+      RCLCPP_INFO(this->get_logger(), "Trajectory generator is already running");
+      _response->success = true;
+      return;
+    }
     RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator node is running");
     setup();
     _response->success = true;
