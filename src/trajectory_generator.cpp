@@ -36,12 +36,15 @@
 
 #include "trajectory_generator.hpp"
 
+#include <rclcpp/qos.hpp>
+
 TrajectoryGenerator::TrajectoryGenerator()
     : as2::Node("trajectory_generator"),
       v_positions_(4),
       v_velocities_(4),
       v_accelerations_(4),
-      motion_handler(this)
+      motion_handler(this),
+      eval_time_(0, 0)
 {
   set_trajectory_waypoints_srv_ = this->create_service<as2_msgs::srv::SendTrajectoryWaypoints>(
       as2_names::services::motion_reference::send_traj_wayp,
@@ -64,33 +67,79 @@ TrajectoryGenerator::TrajectoryGenerator()
                 std::placeholders::_2  // Corresponds to the 'response' input
                 ));
 
+  run_node_srv_ = this->create_service<std_srvs::srv::SetBool>(
+      "traj_gen/run_node", std::bind(&TrajectoryGenerator::runNodeSrvCall, this,
+                                     std::placeholders::_1, // Corresponds to the 'request'  input
+                                     std::placeholders::_2  // Corresponds to the 'response' input
+                                     ));
+
   mod_waypoint_sub_ = this->create_subscription<as2_msgs::msg::PoseStampedWithID>(
-      as2_names::topics::motion_reference::modify_waypoint,
-      as2_names::topics::motion_reference::qos_waypoint,
+      as2_names::topics::motion_reference::modify_waypoint, as2_names::topics::motion_reference::qos_waypoint,
       std::bind(&TrajectoryGenerator::modifyWaypointCallback, this, std::placeholders::_1));
 
-  pose_sub_ = std::make_shared<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>>(this, as2_names::topics::self_localization::pose, as2_names::topics::self_localization::qos.get_rmw_qos_profile());
-  twist_sub_ = std::make_shared<message_filters::Subscriber<geometry_msgs::msg::TwistStamped>>(this, as2_names::topics::self_localization::twist, as2_names::topics::self_localization::qos.get_rmw_qos_profile());
-  synchronizer_ = std::make_shared<message_filters::Synchronizer<approximate_policy>>(approximate_policy(5), *(pose_sub_.get()), *(twist_sub_.get()));
+  yaw_sub_ = this->create_subscription<std_msgs::msg::Float32>(
+      "traj_gen/yaw", rclcpp::SensorDataQoS(),
+      std::bind(&TrajectoryGenerator::yawCallback, this, std::placeholders::_1));
+
+  pose_sub_ = std::make_shared<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>>(
+      this, as2_names::topics::self_localization::pose,
+      as2_names::topics::self_localization::qos.get_rmw_qos_profile());
+  twist_sub_ = std::make_shared<message_filters::Subscriber<geometry_msgs::msg::TwistStamped>>(
+      this, as2_names::topics::self_localization::twist,
+      as2_names::topics::self_localization::qos.get_rmw_qos_profile());
+  synchronizer_ = std::make_shared<message_filters::Synchronizer<approximate_policy>>(
+      approximate_policy(5), *(pose_sub_.get()), *(twist_sub_.get()));
   synchronizer_->registerCallback(&TrajectoryGenerator::state_callback, this);
 
   ref_point_pub = this->create_publisher<visualization_msgs::msg::Marker>(REF_TRAJ_TOPIC, 1);
 
   path_pub_ = this->create_publisher<nav_msgs::msg::Path>(PATH_DEBUG_TOPIC, 1);
 
+  traj_gen_info_pub_ = this->create_publisher<as2_msgs::msg::TrajGenInfo>(
+      as2_names::topics::motion_reference::traj_gen_info, 1);
+
+  static auto info_timer = this->create_wall_timer(
+      std::chrono::milliseconds(100), std::bind(&TrajectoryGenerator::publishTrajGenInfo, this));
+
   frame_id_ = generateTfName(this->get_namespace(), "odom");
+  traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::STOPPED;
 }
 
-void TrajectoryGenerator::setup() {}
+void TrajectoryGenerator::publishTrajGenInfo(){
+  traj_gen_info_msg_.header.stamp = this->now();
+  traj_gen_info_msg_.node_status.status = as2_msgs::msg::NodeStatus::ACTIVE;
+  traj_gen_info_pub_->publish(traj_gen_info_msg_);
+}
+
+void TrajectoryGenerator::setup()
+{
+  trajectory_generator_ = std::make_shared<dynamic_traj_generator::DynamicTrajectory>();
+  has_yaw_from_topic_ = false;
+  first_time_ = true;
+  time_zero_ = this->now();
+  eval_time_ = time_zero_ - time_zero_;
+  publish_trajectory_ = false;
+  evaluate_trajectory_ = false;
+  has_odom_ = false;
+  has_prev_v_ = false;
+  prev_vx_ = 0.0;
+  prev_vy_ = 0.0;
+  yaw_mode_ = 0;
+  begin_traj_yaw_ = 0.0f;
+  v_positions_ = {0.0f, 0.0f, 0.0f, 0.0f};
+  v_velocities_ = {0.0f, 0.0f, 0.0f, 0.0f};
+  v_accelerations_ = {0.0f, 0.0f, 0.0f, 0.0f};
+  traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::WAITING;
+}
 
 void TrajectoryGenerator::run()
 {
-  static bool first_time = true;
-  static rclcpp::Time time_zero = rclcpp::Clock().now();
-  static auto eval_time = time_zero - time_zero;
-  static bool publish_trajectory = false;
+  // static bool first_time = true;
+  // static rclcpp::Time time_zero = rclcpp::Clock().now();
+  // static auto eval_time = time_zero - time_zero;
+  // static bool publish_trajectory = false;
 
-  if (!evaluate_trajectory_)
+  if (!evaluate_trajectory_ || !trajectory_generator_)
   {
     return;
   }
@@ -99,34 +148,36 @@ void TrajectoryGenerator::run()
     RCLCPP_WARN(this->get_logger(), "No odometry information available");
     return;
   }
-  if (first_time)
+  if (first_time_)
   {
-    publish_trajectory = evaluateTrajectory(0);
-    if (publish_trajectory)
-      first_time = false;
-    time_zero = rclcpp::Clock().now();
+    publish_trajectory_ = evaluateTrajectory(0);
+    if (publish_trajectory_)
+      first_time_ = false;
+    time_zero_ = this->now();
   }
   else
   {
-    eval_time = rclcpp::Clock().now() - time_zero;
+    eval_time_ = this->now() - time_zero_;
 
-    if (trajectory_generator_.getMaxTime() + 0.2 > eval_time.seconds())
+    if (trajectory_generator_->getMaxTime() + 0.2 > eval_time_.seconds())
     {
-      publish_trajectory = evaluateTrajectory(eval_time.seconds());
+      traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::EVALUATING;
+      publish_trajectory_ = evaluateTrajectory(eval_time_.seconds());
     }
     else
     {
-      evaluateTrajectory(eval_time.seconds());
-      publish_trajectory = false;
+      traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::WAITING;
+      evaluateTrajectory(eval_time_.seconds());
+      publish_trajectory_ = false;
     }
   }
 
   plotRefTrajPoint();
 
-  if (publish_trajectory)
+  if (publish_trajectory_)
   {
     motion_handler.sendTrajectoryCommandWithYawAngle(v_positions_, v_velocities_, v_accelerations_);
-    if (trajectory_generator_.getWasTrajectoryRegenerated())
+    if (trajectory_generator_->getWasTrajectoryRegenerated())
     {
       RCLCPP_DEBUG(this->get_logger(), "Plot trajectory");
       plotTrajectory();
@@ -137,7 +188,7 @@ void TrajectoryGenerator::run()
 bool TrajectoryGenerator::evaluateTrajectory(double _eval_time)
 {
   bool publish_trajectory = false;
-  publish_trajectory = trajectory_generator_.evaluateTrajectory(_eval_time, references_);
+  publish_trajectory = trajectory_generator_->evaluateTrajectory(_eval_time, references_);
 
   for (int i = 0; i < 3; i++)
   {
@@ -153,33 +204,53 @@ bool TrajectoryGenerator::evaluateTrajectory(double _eval_time)
     v_positions_[3] = begin_traj_yaw_;
   }
   break;
+
   case as2_msgs::msg::TrajectoryWaypoints::PATH_FACING:
   {
-    static float prev_vx = references_.velocity.x();
-    static float prev_vy = references_.velocity.y();
+    if (!has_prev_v_)
+    {
+      prev_vx_ = references_.velocity.x();
+      prev_vy_ = references_.velocity.y();
+      has_prev_v_ = true;
+    }
     if (fabs(references_.velocity.x()) > 0.01 || (references_.velocity.y()) > 0.01)
     {
-      v_positions_[3] =
-          atan2f((double)references_.velocity.y(), (double)references_.velocity.x());
-      prev_vx = references_.velocity.x();
-      prev_vy = references_.velocity.y();
+      v_positions_[3] = atan2f((double)references_.velocity.y(), (double)references_.velocity.x());
+      prev_vx_ = references_.velocity.x();
+      prev_vy_ = references_.velocity.y();
     }
     else
     {
-      v_positions_[3] = atan2f((double)prev_vy, (double)prev_vx);
+      v_positions_[3] = atan2f((double)prev_vy_, (double)prev_vx_);
     }
   }
   break;
+
   case as2_msgs::msg::TrajectoryWaypoints::GENERATE_YAW_TRAJ:
   {
     v_positions_[3] = 0.0f;
-    std::cerr << "YAW MODE NOT IMPLEMENTED YET" << std::endl;
+    RCLCPP_ERROR(get_logger(), "YAW MODE NOT IMPLEMENTED YET");
+  }
+  break;
+
+  case as2_msgs::msg::TrajectoryWaypoints::YAW_FROM_TOPIC:
+  {
+    if (has_yaw_from_topic_)
+    {
+      v_positions_[3] = yaw_from_topic_;
+      // RCLCPP_DEBUG(get_logger(), "RECEIVED YAW %.2f", yaw_from_topic_);
+    }
+    else
+    {
+      v_positions_[3] = begin_traj_yaw_;
+      // RCLCPP_DEBUG(get_logger(), "INITIAL YAW %.2f", begin_traj_yaw_);
+    }
   }
   break;
 
   default:
   {
-    std::cerr << "YAW MODE NOT DEFINED" << std::endl;
+    RCLCPP_ERROR(get_logger(), "YAW MODE NOT DEFINED");
   }
   break;
   }
@@ -189,10 +260,13 @@ bool TrajectoryGenerator::evaluateTrajectory(double _eval_time)
 
 void TrajectoryGenerator::updateState()
 {
-  Eigen::Vector3d current_position(current_state_pose_.pose.position.x,
-                                   current_state_pose_.pose.position.y,
+  if (!trajectory_generator_)
+  {
+    return;
+  }
+  Eigen::Vector3d current_position(current_state_pose_.pose.position.x, current_state_pose_.pose.position.y,
                                    current_state_pose_.pose.position.z);
-  trajectory_generator_.updateVehiclePosition(current_position);
+  trajectory_generator_->updateVehiclePosition(current_position);
 }
 
 /************************/
@@ -203,6 +277,12 @@ void TrajectoryGenerator::setTrajectoryWaypointsSrvCall(
     const std::shared_ptr<as2_msgs::srv::SendTrajectoryWaypoints::Request> _request,
     std::shared_ptr<as2_msgs::srv::SendTrajectoryWaypoints::Response> _response)
 {
+  if (!trajectory_generator_)
+  {
+    RCLCPP_WARN(this->get_logger(), "No trajectory generator available start trajectory generator first");
+    _response->success = false;
+    return;
+  }
   RCLCPP_INFO(this->get_logger(), "Waypoints to set has been received");
   _response->success = true;
   auto &waypoints_msg = *(_request.get());
@@ -220,7 +300,7 @@ void TrajectoryGenerator::setTrajectoryWaypointsSrvCall(
   }
 
   begin_traj_yaw_ = extractYawFromQuat(current_state_pose_.pose.orientation);
-  trajectory_generator_.setWaypoints(waypoints_to_set);
+  trajectory_generator_->setWaypoints(waypoints_to_set);
   evaluate_trajectory_ = true;
 }
 
@@ -229,6 +309,11 @@ void TrajectoryGenerator::addTrajectoryWaypointsSrvCall(
     std::shared_ptr<as2_msgs::srv::SendTrajectoryWaypoints::Response> _response)
 {
   RCLCPP_DEBUG(this->get_logger(), "Waypoints to add has been received");
+  if (!trajectory_generator_)
+  {
+    RCLCPP_WARN(this->get_logger(), "No trajectory generator available start trajectory generator first");
+    _response->success = false;
+  }
   _response->success = true;
 
   dynamic_traj_generator::DynamicWaypoint dynamic_waypoint;
@@ -237,18 +322,22 @@ void TrajectoryGenerator::addTrajectoryWaypointsSrvCall(
   {
     dynamic_traj_generator::DynamicWaypoint dynamic_waypoint;
     generateDynamicPoint(waypoint, dynamic_waypoint);
-    trajectory_generator_.appendWaypoint(dynamic_waypoint);
-    RCLCPP_INFO(this->get_logger(), "waypoint[%s] added: (%.2f, %.2f, %.2f)",
-                dynamic_waypoint.getName().c_str(), dynamic_waypoint.getOriginalPosition().x(),
-                dynamic_waypoint.getOriginalPosition().y(),
+    trajectory_generator_->appendWaypoint(dynamic_waypoint);
+    RCLCPP_INFO(this->get_logger(), "waypoint[%s] added: (%.2f, %.2f, %.2f)", dynamic_waypoint.getName().c_str(),
+                dynamic_waypoint.getOriginalPosition().x(), dynamic_waypoint.getOriginalPosition().y(),
                 dynamic_waypoint.getOriginalPosition().z()); // DEBUG
   }
 }
 
-void TrajectoryGenerator::setSpeedSrvCall(
-    const std::shared_ptr<as2_msgs::srv::SetSpeed::Request> _request,
-    std::shared_ptr<as2_msgs::srv::SetSpeed::Response> _response)
+void TrajectoryGenerator::setSpeedSrvCall(const std::shared_ptr<as2_msgs::srv::SetSpeed::Request> _request,
+                                          std::shared_ptr<as2_msgs::srv::SetSpeed::Response> _response)
 {
+  if (!trajectory_generator_)
+  {
+    RCLCPP_WARN(this->get_logger(), "No trajectory generator available start trajectory generator first");
+    _response->success = false;
+    return;
+  }
   float max_speed = _request->speed.speed;
   RCLCPP_INFO(this->get_logger(), "Speed (%.2f) to be set has been received", max_speed);
   if (max_speed <= 0.0)
@@ -259,28 +348,53 @@ void TrajectoryGenerator::setSpeedSrvCall(
   }
   _response->success = true;
 
-  trajectory_generator_.setSpeed(max_speed);
+  trajectory_generator_->setSpeed(max_speed);
 }
+
+void TrajectoryGenerator::runNodeSrvCall(const std::shared_ptr<std_srvs::srv::SetBool::Request> _request,
+                                         std::shared_ptr<std_srvs::srv::SetBool::Response> _response)
+{
+  if (_request->data)
+  {
+    if (traj_gen_info_msg_.active_status != as2_msgs::msg::TrajGenInfo::STOPPED){
+      RCLCPP_INFO(this->get_logger(), "Trajectory generator is already running");
+      _response->success = true;
+      return;
+    }
+    RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator node is running");
+    setup();
+    _response->success = true;
+  }
+  else
+  {
+    stop();
+    RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator node is stopped");
+    _response->success = true;
+  }
+};
 
 /*********************/
 /** Topic Callbacks **/
 /*********************/
 
-void TrajectoryGenerator::modifyWaypointCallback(
-    const as2_msgs::msg::PoseStampedWithID::SharedPtr _msg)
+void TrajectoryGenerator::modifyWaypointCallback(const as2_msgs::msg::PoseStampedWithID::SharedPtr _msg)
 {
   RCLCPP_DEBUG(this->get_logger(), "Waypoint[%s] to modify has been received", _msg->id.c_str());
+  if (!trajectory_generator_)
+  {
+    RCLCPP_WARN(this->get_logger(), "No trajectory generator available start trajectory generator first");
+  }
   dynamic_traj_generator::DynamicWaypoint dynamic_waypoint;
   Eigen::Vector3d position;
   position.x() = _msg->pose.position.x;
   position.y() = _msg->pose.position.y;
   position.z() = _msg->pose.position.z;
-  trajectory_generator_.modifyWaypoint(_msg->id, position);
+  trajectory_generator_->modifyWaypoint(_msg->id, position);
 }
 
 // TODO: if onExecute is done with timer no atomic attributes needed
 void TrajectoryGenerator::state_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr pose_msg,
-                    const geometry_msgs::msg::TwistStamped::ConstSharedPtr twist_msg)
+                                         const geometry_msgs::msg::TwistStamped::ConstSharedPtr twist_msg)
 {
   if (!has_odom_)
   {
@@ -294,9 +408,13 @@ void TrajectoryGenerator::state_callback(const geometry_msgs::msg::PoseStamped::
   updateState();
 };
 
-void TrajectoryGenerator::waypointsCallback(
-    const as2_msgs::msg::TrajectoryWaypoints::SharedPtr _msg)
+void TrajectoryGenerator::waypointsCallback(const as2_msgs::msg::TrajectoryWaypoints::SharedPtr _msg)
 {
+  if (!trajectory_generator_)
+  {
+    RCLCPP_WARN(this->get_logger(), "No trajectory generator available start trajectory generator first");
+    return;
+  }
   RCLCPP_DEBUG(this->get_logger(), "Waypoints received");
   auto &waypoints_msg = *(_msg.get());
 
@@ -312,7 +430,7 @@ void TrajectoryGenerator::waypointsCallback(
     return;
   }
 
-  trajectory_generator_.setSpeed(max_speed);
+  trajectory_generator_->setSpeed(max_speed);
 
   for (auto waypoint : waypoints_msg.poses)
   {
@@ -324,13 +442,18 @@ void TrajectoryGenerator::waypointsCallback(
   // DEBUG
   for (auto &dw : waypoints_to_set)
   {
-    RCLCPP_INFO(this->get_logger(), "setting waypoint[%s]: (%.2f, %.2f, %.2f)",
-                dw.getName().c_str(), dw.getOriginalPosition().x(), dw.getOriginalPosition().y(),
-                dw.getOriginalPosition().z());
+    RCLCPP_INFO(this->get_logger(), "setting waypoint[%s]: (%.2f, %.2f, %.2f)", dw.getName().c_str(),
+                dw.getOriginalPosition().x(), dw.getOriginalPosition().y(), dw.getOriginalPosition().z());
   }
 
-  trajectory_generator_.setWaypoints(waypoints_to_set);
+  trajectory_generator_->setWaypoints(waypoints_to_set);
   evaluate_trajectory_ = true;
+}
+
+void TrajectoryGenerator::yawCallback(const std_msgs::msg::Float32::SharedPtr _msg)
+{
+  has_yaw_from_topic_ = true;
+  yaw_from_topic_ = _msg->data;
 }
 
 /********************/
@@ -351,8 +474,8 @@ void TrajectoryGenerator::plotTrajectoryThread()
 {
   nav_msgs::msg::Path path_msg;
   const float step = 0.2;
-  const float max_time = trajectory_generator_.getMaxTime();
-  const float min_time = trajectory_generator_.getMinTime();
+  const float max_time = trajectory_generator_->getMaxTime();
+  const float min_time = trajectory_generator_->getMinTime();
   dynamic_traj_generator::References refs;
   const int n_measures = (max_time - min_time) / step;
   auto time_stamp = rclcpp::Clock().now();
@@ -362,7 +485,7 @@ void TrajectoryGenerator::plotTrajectoryThread()
     geometry_msgs::msg::PoseStamped pose_msg;
     pose_msg.header.frame_id = frame_id_;
     pose_msg.header.stamp = time_stamp;
-    trajectory_generator_.evaluateTrajectory(time, refs, true, true);
+    trajectory_generator_->evaluateTrajectory(time, refs, true, true);
     pose_msg.pose.position.x = refs.position.x();
     pose_msg.pose.position.y = refs.position.y();
     pose_msg.pose.position.z = refs.position.z();
@@ -434,8 +557,7 @@ void generateDynamicPoint(const geometry_msgs::msg::PoseStamped &msg,
   dynamic_point.resetWaypoint(position);
 }
 
-void generateDynamicPoint(const nav_msgs::msg::Odometry &msg,
-                          dynamic_traj_generator::DynamicWaypoint &dynamic_point)
+void generateDynamicPoint(const nav_msgs::msg::Odometry &msg, dynamic_traj_generator::DynamicWaypoint &dynamic_point)
 {
   Eigen::Vector3d position;
   position.x() = msg.pose.pose.position.x;
