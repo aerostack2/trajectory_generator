@@ -37,11 +37,10 @@
 #include "as2_core/core_functions.hpp"
 #include "trajectory_generator.hpp"
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<TrajectoryGenerator>();
-  node->preset_loop_frequency(50); // Node frequency for run and callbacks
+  node->preset_loop_frequency(50);  // Node frequency for run and callbacks
   node->setup();
   as2::spinLoop(node, std::bind(&TrajectoryGenerator::run, node));
 

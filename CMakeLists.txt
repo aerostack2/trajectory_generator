@@ -63,6 +63,16 @@ add_executable(${PROJECT_NAME}_node src/trajectory_generator_node.cpp ${SOURCE_C
 target_link_libraries(${PROJECT_NAME}_node dynamic_trajectory_generator yaml-cpp)
 ament_target_dependencies(${PROJECT_NAME}_node ${PROJECT_DEPENDENCIES})
 
+if(BUILD_TESTING)
+
+  find_package(ament_cmake_cppcheck REQUIRED)
+  find_package(ament_cmake_clang_format REQUIRED)
+  
+  ament_cppcheck(src/ include/ tests/)
+  ament_clang_format(src/ include/ tests/ --config ${CMAKE_CURRENT_SOURCE_DIR}/.clang-format)
+
+endif()
+
 install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME})
