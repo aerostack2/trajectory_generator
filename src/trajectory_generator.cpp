@@ -78,7 +78,7 @@ TrajectoryGenerator::TrajectoryGenerator()
 
   path_pub_ = this->create_publisher<nav_msgs::msg::Path>(PATH_DEBUG_TOPIC, 1);
 
-  frame_id_ = generateTfName(this->get_namespace(), "odom");
+  frame_id_ = as2::tf::generateTfName(this->get_namespace(), "odom");
 }
 
 void TrajectoryGenerator::setup() {}
