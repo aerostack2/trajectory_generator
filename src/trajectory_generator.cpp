@@ -125,7 +125,7 @@ void TrajectoryGenerator::run()
 
   if (publish_trajectory)
   {
-    motion_handler.sendTrajectoryCommandWithYawAngle(v_positions_, v_velocities_, v_accelerations_);
+    motion_handler.sendTrajectoryCommandWithYawAngle(frame_id_, v_positions_, v_velocities_, v_accelerations_);
     if (trajectory_generator_.getWasTrajectoryRegenerated())
     {
       RCLCPP_DEBUG(this->get_logger(), "Plot trajectory");
