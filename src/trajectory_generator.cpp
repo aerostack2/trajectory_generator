@@ -114,7 +114,7 @@ TrajectoryGenerator::TrajectoryGenerator()
       std::chrono::milliseconds(100),
       std::bind(&TrajectoryGenerator::publishTrajGenInfo, this));
 
-  frame_id_ = generateTfName(this->get_namespace(), "odom");
+  frame_id_ = as2::tf::generateTfName(this->get_namespace(), "odom");
   traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::STOPPED;
 }
 
@@ -179,7 +179,7 @@ void TrajectoryGenerator::run() {
 
   if (publish_trajectory_) {
     motion_handler.sendTrajectoryCommandWithYawAngle(
-        v_positions_, v_velocities_, v_accelerations_);
+        frame_id_, v_positions_, v_velocities_, v_accelerations_);
     if (trajectory_generator_->getWasTrajectoryRegenerated()) {
       RCLCPP_DEBUG(this->get_logger(), "Plot trajectory");
       plotTrajectory();

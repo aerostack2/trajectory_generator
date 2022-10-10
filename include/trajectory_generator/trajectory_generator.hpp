@@ -50,7 +50,7 @@
 #include "as2_core/names/services.hpp"
 #include "as2_core/names/topics.hpp"
 #include "as2_core/node.hpp"
-#include "as2_core/tf_utils.hpp"
+#include "as2_core/utils/tf_utils.hpp"
 #include "as2_msgs/msg/traj_gen_info.hpp"
 #include "as2_msgs/msg/trajectory_waypoints.hpp"
 #include "as2_msgs/msg/trajectory_waypoints_with_id.hpp"
