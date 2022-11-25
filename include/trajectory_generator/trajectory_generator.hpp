@@ -110,7 +110,8 @@ class TrajectoryGenerator : public as2::Node {
   std::shared_ptr<dynamic_traj_generator::DynamicTrajectory>
       trajectory_generator_;
 
-  std::string frame_id_;
+  std::string base_link_frame_id_;
+  std::string odom_frame_id_;
   int yaw_mode_ = 0;
   float begin_traj_yaw_ = 0.0f;
   std::vector<double> v_positions_;

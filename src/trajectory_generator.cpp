@@ -108,7 +108,7 @@ TrajectoryGenerator::TrajectoryGenerator()
       std::chrono::milliseconds(100),
       std::bind(&TrajectoryGenerator::publishTrajGenInfo, this));
 
-  frame_id_ = as2::tf::generateTfName(this->get_namespace(), "odom");
+  odom_frame_id_ = as2::tf::generateTfName(this, "odom");
   traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::STOPPED;
 }
 
@@ -173,7 +173,7 @@ void TrajectoryGenerator::run() {
 
   if (publish_trajectory_) {
     motion_handler.sendTrajectoryCommandWithYawAngle(
-        frame_id_, v_positions_, v_velocities_, v_accelerations_);
+        odom_frame_id_, v_positions_, v_velocities_, v_accelerations_);
     if (trajectory_generator_->getWasTrajectoryRegenerated()) {
       RCLCPP_DEBUG(this->get_logger(), "Plot trajectory");
       plotTrajectory();
@@ -384,18 +384,14 @@ void TrajectoryGenerator::state_callback(
     has_odom_ = true;
   }
 
-  geometry_msgs::msg::PoseStamped pose_msg;
-  geometry_msgs::msg::TwistStamped twist_msg = *_twist_msg;
-
-  if (!tf_handler_.tryConvert(twist_msg, frame_id_)) return;
+    geometry_msgs::msg::PoseStamped pose_msg;
+  geometry_msgs::msg::TwistStamped twist_msg;
 
   try {
-    pose_msg = tf_handler_.getPoseStamped(
-        frame_id_, as2::tf::generateTfName(this, "base_link"),
-        tf2_ros::fromMsg(twist_msg.header.stamp));
+    auto [pose_msg, twist_msg] =
+        tf_handler_.getState(*_twist_msg, odom_frame_id_, odom_frame_id_, base_link_frame_id_);
   } catch (tf2::TransformException &ex) {
-    RCLCPP_WARN(this->get_logger(), "Could not get state pose transform: %s",
-                ex.what());
+    RCLCPP_WARN(this->get_logger(), "Could not get transform: %s", ex.what());
     return;
   }
 
@@ -475,7 +471,7 @@ void TrajectoryGenerator::plotTrajectoryThread() {
   path_msg.poses.reserve(n_measures);
   for (float time = min_time; time <= max_time; time += step) {
     geometry_msgs::msg::PoseStamped pose_msg;
-    pose_msg.header.frame_id = frame_id_;
+    pose_msg.header.frame_id = odom_frame_id_;
     pose_msg.header.stamp = time_stamp;
     trajectory_generator_->evaluateTrajectory(time, refs, true, true);
     pose_msg.pose.position.x = refs.position.x();
@@ -483,7 +479,7 @@ void TrajectoryGenerator::plotTrajectoryThread() {
     pose_msg.pose.position.z = refs.position.z();
     path_msg.poses.emplace_back(pose_msg);
   }
-  path_msg.header.frame_id = frame_id_;
+  path_msg.header.frame_id = odom_frame_id_;
   path_msg.header.stamp = time_stamp;
 
   RCLCPP_INFO(this->get_logger(), "DEBUG: Plotting trajectory");
@@ -493,7 +489,7 @@ void TrajectoryGenerator::plotTrajectoryThread() {
 void TrajectoryGenerator::plotRefTrajPoint() {
   visualization_msgs::msg::Marker point_msg;
 
-  point_msg.header.frame_id = frame_id_;
+  point_msg.header.frame_id = odom_frame_id_;
   point_msg.header.stamp = rclcpp::Clock().now();
   point_msg.type = visualization_msgs::msg::Marker::SPHERE;
   point_msg.action = visualization_msgs::msg::Marker::ADD;
