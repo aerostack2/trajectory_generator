@@ -109,6 +109,7 @@ TrajectoryGenerator::TrajectoryGenerator()
       std::bind(&TrajectoryGenerator::publishTrajGenInfo, this));
 
   odom_frame_id_ = as2::tf::generateTfName(this, "odom");
+  base_link_frame_id_ = as2::tf::generateTfName(this, "base_link");
   traj_gen_info_msg_.active_status = as2_msgs::msg::TrajGenInfo::STOPPED;
 }
 
