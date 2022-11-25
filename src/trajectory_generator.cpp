@@ -384,19 +384,16 @@ void TrajectoryGenerator::state_callback(
     has_odom_ = true;
   }
 
-    geometry_msgs::msg::PoseStamped pose_msg;
-  geometry_msgs::msg::TwistStamped twist_msg;
-
   try {
-    auto [pose_msg, twist_msg] =
-        tf_handler_.getState(*_twist_msg, odom_frame_id_, odom_frame_id_, base_link_frame_id_);
+    auto [pose_msg, twist_msg] = tf_handler_.getState(
+        *_twist_msg, odom_frame_id_, odom_frame_id_, base_link_frame_id_);
+
+    current_state_pose_ = pose_msg;
+    current_state_twist_ = twist_msg;
   } catch (tf2::TransformException &ex) {
     RCLCPP_WARN(this->get_logger(), "Could not get transform: %s", ex.what());
     return;
   }
-
-  current_state_pose_ = pose_msg;
-  current_state_twist_ = twist_msg;
 
   updateState();
 };
