@@ -39,6 +39,7 @@ set(PROJECT_DEPENDENCIES
   std_msgs
   as2_msgs
   std_srvs
+  as2_behavior
   trajectory_msgs
   geometry_msgs
   visualization_msgs
