@@ -44,7 +44,8 @@ TrajectoryGenerator::TrajectoryGenerator()
       v_velocities_(4),
       v_accelerations_(4),
       motion_handler(this),
-      eval_time_(0, 0) {
+      eval_time_(0, 0),
+      tf_handler_(this) {
   set_trajectory_waypoints_srv_ =
       this->create_service<as2_msgs::srv::SendTrajectoryWaypoints>(
           as2_names::services::motion_reference::send_traj_wayp,
@@ -89,18 +90,11 @@ TrajectoryGenerator::TrajectoryGenerator()
       std::bind(&TrajectoryGenerator::yawCallback, this,
                 std::placeholders::_1));
 
-  pose_sub_ = std::make_shared<
-      message_filters::Subscriber<geometry_msgs::msg::PoseStamped>>(
-      this, as2_names::topics::self_localization::pose,
-      as2_names::topics::self_localization::qos.get_rmw_qos_profile());
-  twist_sub_ = std::make_shared<
-      message_filters::Subscriber<geometry_msgs::msg::TwistStamped>>(
-      this, as2_names::topics::self_localization::twist,
-      as2_names::topics::self_localization::qos.get_rmw_qos_profile());
-  synchronizer_ =
-      std::make_shared<message_filters::Synchronizer<approximate_policy>>(
-          approximate_policy(5), *(pose_sub_.get()), *(twist_sub_.get()));
-  synchronizer_->registerCallback(&TrajectoryGenerator::state_callback, this);
+  twist_sub_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
+      as2_names::topics::self_localization::twist,
+      as2_names::topics::self_localization::qos,
+      std::bind(&TrajectoryGenerator::state_callback, this,
+                std::placeholders::_1));
 
   ref_point_pub = this->create_publisher<visualization_msgs::msg::Marker>(
       REF_TRAJ_TOPIC, 1);
@@ -110,7 +104,7 @@ TrajectoryGenerator::TrajectoryGenerator()
   traj_gen_info_pub_ = this->create_publisher<as2_msgs::msg::TrajGenInfo>(
       as2_names::topics::motion_reference::traj_gen_info, 1);
 
-  static auto info_timer = this->create_wall_timer(
+  static auto control_timer_ = this->create_timer(
       std::chrono::milliseconds(100),
       std::bind(&TrajectoryGenerator::publishTrajGenInfo, this));
 
@@ -384,15 +378,29 @@ void TrajectoryGenerator::modifyWaypointCallback(
 
 // TODO: if onExecute is done with timer no atomic attributes needed
 void TrajectoryGenerator::state_callback(
-    const geometry_msgs::msg::PoseStamped::ConstSharedPtr pose_msg,
-    const geometry_msgs::msg::TwistStamped::ConstSharedPtr twist_msg) {
+    const geometry_msgs::msg::TwistStamped::SharedPtr _twist_msg) {
   if (!has_odom_) {
     RCLCPP_INFO(this->get_logger(), "State callback working");
     has_odom_ = true;
   }
 
-  current_state_pose_ = *(pose_msg.get());
-  current_state_twist_ = *(twist_msg.get());
+  geometry_msgs::msg::PoseStamped pose_msg;
+  geometry_msgs::msg::TwistStamped twist_msg = *_twist_msg;
+
+  if (!tf_handler_.tryConvert(twist_msg, frame_id_)) return;
+
+  try {
+    pose_msg = tf_handler_.getPoseStamped(
+        frame_id_, as2::tf::generateTfName(this, "base_link"),
+        tf2_ros::fromMsg(twist_msg.header.stamp));
+  } catch (tf2::TransformException &ex) {
+    RCLCPP_WARN(this->get_logger(), "Could not get state pose transform: %s",
+                ex.what());
+    return;
+  }
+
+  current_state_pose_ = pose_msg;
+  current_state_twist_ = twist_msg;
 
   updateState();
 };

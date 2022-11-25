@@ -89,16 +89,7 @@ class TrajectoryGenerator : public as2::Node {
   rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr run_node_srv_;
 
   /** Subscriptions **/
-  std::shared_ptr<message_filters::Subscriber<geometry_msgs::msg::PoseStamped>>
-      pose_sub_;
-  std::shared_ptr<message_filters::Subscriber<geometry_msgs::msg::TwistStamped>>
-      twist_sub_;
-  typedef message_filters::sync_policies::ApproximateTime<
-      geometry_msgs::msg::PoseStamped, geometry_msgs::msg::TwistStamped>
-      approximate_policy;
-  std::shared_ptr<message_filters::Synchronizer<approximate_policy>>
-      synchronizer_;
-
+  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr twist_sub_;
   rclcpp::Subscription<as2_msgs::msg::PoseStampedWithID>::SharedPtr
       mod_waypoint_sub_;
   rclcpp::Subscription<as2_msgs::msg::TrajectoryWaypoints>::SharedPtr
@@ -111,6 +102,7 @@ class TrajectoryGenerator : public as2::Node {
   /** Motion Handler **/
   as2::motionReferenceHandlers::TrajectoryMotion motion_handler;
 
+  as2::tf::TfHandler tf_handler_;
   bool evaluate_trajectory_ = false;
   bool has_odom_ = false;
 
@@ -168,9 +160,7 @@ class TrajectoryGenerator : public as2::Node {
   /** Topic Callbacks **/
   void modifyWaypointCallback(
       const as2_msgs::msg::PoseStampedWithID::SharedPtr _msg);
-  void state_callback(
-      const geometry_msgs::msg::PoseStamped::ConstSharedPtr pose_msg,
-      const geometry_msgs::msg::TwistStamped::ConstSharedPtr twist_msg);
+  void state_callback(const geometry_msgs::msg::TwistStamped::SharedPtr msg);
   void waypointsCallback(
       const as2_msgs::msg::TrajectoryWaypoints::SharedPtr _msg);
 
