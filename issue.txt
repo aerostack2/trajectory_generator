@@ -1,9 +1,0 @@
-
-trajectory_generator_->evaluateTrajectory always return True
-
-trajectory_generator_->modifyWaypoint(dynamic_waypoint.getName(), dynamic_waypoint.getCurrentPosition()); ->
-trajectory_generator_->modifyWaypoint(dynamic_waypoint);
-
-getLastWaypointEvaluatedId();
-
-Why plotTrajectory Debug is a thread¿?
