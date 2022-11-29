@@ -45,6 +45,7 @@ set(PROJECT_DEPENDENCIES
   visualization_msgs
   yaml-cpp
   motion_reference_handlers
+  Eigen3
 )
 
 foreach(DEPENDENCY ${PROJECT_DEPENDENCIES})
@@ -54,6 +55,7 @@ endforeach()
 include_directories(
   include
   include/${PROJECT_NAME}
+  ${EIGEN3_INCLUDE_DIRS}
 )
 
 set(SOURCE_CPP_FILES 
