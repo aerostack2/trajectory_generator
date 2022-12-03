@@ -38,12 +38,15 @@
 
 TrajectoryGeneratorBehavior::TrajectoryGeneratorBehavior()
     : as2_behavior::BehaviorServer<as2_msgs::action::TrajectoryGenerator>(
-          "TrajectoryGenerator"),
+          as2_names::actions::behaviours::trajectorygenerator),
       trajectory_motion_handler_(this),
       hover_motion_handler_(this),
       tf_handler_(this) {
   desired_frame_id_ = as2::tf::generateTfName(this, "odom");
   base_link_frame_id_ = as2::tf::generateTfName(this, "base_link");
+
+  trajectory_generator_ =
+      std::make_shared<dynamic_traj_generator::DynamicTrajectory>();
 
   state_sub_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
       as2_names::topics::self_localization::twist,
@@ -84,9 +87,10 @@ void TrajectoryGeneratorBehavior::stateCallback(
       has_odom_ = true;
     }
 
-    if (!trajectory_generator_) {
-      return;
-    }
+    // if (!trajectory_generator_) {
+    //   return;
+    // }
+
     current_yaw_ = as2::frame::getYawFromQuaternion(pose_msg.pose.orientation);
     trajectory_generator_->updateVehiclePosition(
         Eigen::Vector3d(pose_msg.pose.position.x, pose_msg.pose.position.y,
@@ -105,6 +109,7 @@ void TrajectoryGeneratorBehavior::yawCallback(
 
 bool TrajectoryGeneratorBehavior::on_activate(
     std::shared_ptr<const as2_msgs::action::TrajectoryGenerator::Goal> goal) {
+  RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator goal accepted");
   if (goal->trajectory_waypoints.header.frame_id != desired_frame_id_) {
     RCLCPP_ERROR(this->get_logger(),
                  "Goal frame_id %s is not the same as desired frame_id %s",
@@ -141,8 +146,8 @@ bool TrajectoryGeneratorBehavior::on_activate(
 }
 
 void TrajectoryGeneratorBehavior::setup() {
-  trajectory_generator_ =
-      std::make_shared<dynamic_traj_generator::DynamicTrajectory>();
+  // trajectory_generator_ =
+  //     std::make_shared<dynamic_traj_generator::DynamicTrajectory>();
   has_yaw_from_topic_ = false;
   has_odom_ = false;
   first_run_ = true;
@@ -184,11 +189,11 @@ void TrajectoryGeneratorBehavior::modifyWaypointCallback(
                "Callback Waypoint[%s] to modify has been received",
                _msg->id.c_str());
 
-  if (!trajectory_generator_) {
-    RCLCPP_WARN(
-        this->get_logger(),
-        "No trajectory generator available start trajectory generator first");
-  }
+  // if (!trajectory_generator_) {
+  //   RCLCPP_WARN(
+  //       this->get_logger(),
+  //       "No trajectory generator available start trajectory generator first");
+  // }
   dynamic_traj_generator::DynamicWaypoint dynamic_waypoint;
   Eigen::Vector3d position;
   position.x() = _msg->pose.position.x;
@@ -227,7 +232,7 @@ bool TrajectoryGeneratorBehavior::on_resume(
 void TrajectoryGeneratorBehavior::on_excution_end(
     const as2_behavior::ExecutionStatus &state) {
   RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator end");
-  trajectory_generator_.reset();
+  // trajectory_generator_.reset();
   hover_motion_handler_.sendHover();
   return;
 };
@@ -239,8 +244,14 @@ as2_behavior::ExecutionStatus TrajectoryGeneratorBehavior::on_run(
         &feedback_msg,
     std::shared_ptr<as2_msgs::action::TrajectoryGenerator::Result>
         &result_msg) {
+  RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator running");
   bool publish_trajectory = false;
+  if (first_run_) time_zero_ = this->now();
   rclcpp::Duration eval_time = this->now() - time_zero_;
+
+  RCLCPP_INFO(this->get_logger(), "Time zero: %f", time_zero_.seconds());
+  RCLCPP_INFO(this->get_logger(), "Current time: %f", this->now().seconds());
+  RCLCPP_INFO(this->get_logger(), "Eval time: %f", eval_time.seconds());
 
   if (trajectory_generator_->getMaxTime() + 0.2 < eval_time.seconds() &&
       !first_run_) {
@@ -251,7 +262,6 @@ as2_behavior::ExecutionStatus TrajectoryGeneratorBehavior::on_run(
   if (first_run_) {
     publish_trajectory = evaluateTrajectory(0);
     if (publish_trajectory) first_run_ = false;
-    time_zero_ = this->now();
   } else {
     publish_trajectory = evaluateTrajectory(eval_time.seconds());
   }

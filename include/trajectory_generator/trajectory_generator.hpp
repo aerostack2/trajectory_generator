@@ -45,6 +45,7 @@
 #include "as2_behavior/behavior_server.hpp"
 #include "as2_core/names/services.hpp"
 #include "as2_core/names/topics.hpp"
+#include "as2_core/names/actions.hpp"
 #include "as2_core/node.hpp"
 #include "as2_core/utils/frame_utils.hpp"
 #include "as2_core/utils/tf_utils.hpp"
