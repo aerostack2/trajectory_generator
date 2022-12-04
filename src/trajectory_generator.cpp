@@ -107,16 +107,61 @@ void TrajectoryGeneratorBehavior::yawCallback(
   yaw_from_topic_ = _msg->data;
 }
 
+bool TrajectoryGeneratorBehavior::goalToDynamicWaypoint(
+    std::shared_ptr<const as2_msgs::action::TrajectoryGenerator::Goal> _goal,
+    dynamic_traj_generator::DynamicWaypoint::Vector &_waypoints_to_set) {
+  std::vector<std::string> waypoint_ids;
+  waypoint_ids.reserve(_goal->path.size());
+
+  for (as2_msgs::msg::PoseWithID waypoint : _goal->path) {
+    // Process each waypoint id
+    if (waypoint.id == "") {
+      RCLCPP_ERROR(this->get_logger(), "Waypoint ID is empty");
+      return false;
+      // Else if waypoint ID is in the list of waypoint IDs, then return false
+    } else if (std::find(waypoint_ids.begin(), waypoint_ids.end(),
+                         waypoint.id) != waypoint_ids.end()) {
+      RCLCPP_ERROR(this->get_logger(), "Waypoint ID %s is not unique",
+                   waypoint.id.c_str());
+      return false;
+    }
+
+    waypoint_ids.push_back(waypoint.id);
+
+    // Process each waypoint frame_id
+    if (_goal->header.frame_id != desired_frame_id_) {
+      geometry_msgs::msg::PoseStamped pose_stamped;
+      pose_stamped.header = _goal->header;
+      pose_stamped.pose = waypoint.pose;
+
+      try {
+        pose_stamped = tf_handler_.convert(pose_stamped, desired_frame_id_);
+      } catch (tf2::TransformException &ex) {
+        RCLCPP_WARN(this->get_logger(), "Could not get transform: %s",
+                    ex.what());
+        return false;
+      }
+
+      waypoint.pose = pose_stamped.pose;
+    }
+
+    // Set to dynamic trajectory generator
+    dynamic_traj_generator::DynamicWaypoint dynamic_waypoint;
+    generateDynamicPoint(waypoint, dynamic_waypoint);
+    _waypoints_to_set.emplace_back(dynamic_waypoint);
+  }
+  return true;
+}
+
 bool TrajectoryGeneratorBehavior::on_activate(
     std::shared_ptr<const as2_msgs::action::TrajectoryGenerator::Goal> goal) {
-  RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator goal accepted");
-  if (goal->trajectory_waypoints.header.frame_id != desired_frame_id_) {
-    RCLCPP_ERROR(this->get_logger(),
-                 "Goal frame_id %s is not the same as desired frame_id %s",
-                 goal->trajectory_waypoints.header.frame_id.c_str(),
-                 desired_frame_id_.c_str());
-    return false;
-  }
+  // if (goal->trajectory_waypoints.header.frame_id != desired_frame_id_) {
+  //   RCLCPP_ERROR(this->get_logger(),
+  //                "Goal frame_id %s is not the same as desired frame_id %s",
+  //                goal->trajectory_waypoints.header.frame_id.c_str(),
+  //                desired_frame_id_.c_str());
+  //   return false;
+  // }
 
   if (!has_odom_) {
     RCLCPP_ERROR(this->get_logger(), "No odometry information available");
@@ -126,22 +171,18 @@ bool TrajectoryGeneratorBehavior::on_activate(
   RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator goal accepted");
   setup();
 
-  // Generate vector of waypoints for trajectory generator, from
-  // as2_msgs/PoseStampedWithId to
+  // Generate vector of waypoints for trajectory generator, from goal to
   // dynamic_traj_generator::DynamicWaypoint::Vector
   dynamic_traj_generator::DynamicWaypoint::Vector waypoints_to_set;
-  waypoints_to_set.reserve(goal->trajectory_waypoints.poses.size());
-  for (auto &waypoint : goal->trajectory_waypoints.poses) {
-    dynamic_traj_generator::DynamicWaypoint dynamic_waypoint;
-    generateDynamicPoint(waypoint, dynamic_waypoint);
-    waypoints_to_set.emplace_back(dynamic_waypoint);
-  }
+  waypoints_to_set.reserve(goal->path.size());
+
+  if (!goalToDynamicWaypoint(goal, waypoints_to_set)) return false;
 
   // Set waypoints to trajectory generator
   trajectory_generator_->setWaypoints(waypoints_to_set);
 
-  yaw_mode_ = goal->trajectory_waypoints.yaw;
-  max_speed_ = goal->trajectory_waypoints.max_speed;
+  yaw_mode_ = goal->yaw;
+  max_speed_ = goal->max_speed;
   return true;
 }
 
@@ -161,14 +202,17 @@ void TrajectoryGeneratorBehavior::setup() {
 bool TrajectoryGeneratorBehavior::on_modify(
     std::shared_ptr<const as2_msgs::action::TrajectoryGenerator::Goal> goal) {
   RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator goal modified");
-  // Generate vector of waypoints for trajectory generator, from
-  // as2_msgs/PoseStampedWithId to
+
+  // Generate vector of waypoints for trajectory generator, from goal to
   // dynamic_traj_generator::DynamicWaypoint::Vector
   dynamic_traj_generator::DynamicWaypoint::Vector waypoints_to_set;
-  waypoints_to_set.reserve(goal->trajectory_waypoints.poses.size());
-  for (auto &waypoint : goal->trajectory_waypoints.poses) {
-    dynamic_traj_generator::DynamicWaypoint dynamic_waypoint;
-    generateDynamicPoint(waypoint, dynamic_waypoint);
+  waypoints_to_set.reserve(goal->path.size());
+
+  if (!goalToDynamicWaypoint(goal, waypoints_to_set)) return false;
+
+  // Modify each waypoint
+  for (dynamic_traj_generator::DynamicWaypoint dynamic_waypoint :
+       waypoints_to_set) {
     trajectory_generator_->modifyWaypoint(
         dynamic_waypoint.getName(), dynamic_waypoint.getCurrentPosition());
 
@@ -189,16 +233,21 @@ void TrajectoryGeneratorBehavior::modifyWaypointCallback(
                "Callback Waypoint[%s] to modify has been received",
                _msg->id.c_str());
 
-  // if (!trajectory_generator_) {
-  //   RCLCPP_WARN(
-  //       this->get_logger(),
-  //       "No trajectory generator available start trajectory generator first");
-  // }
-  dynamic_traj_generator::DynamicWaypoint dynamic_waypoint;
+  geometry_msgs::msg::PoseStamped pose_stamped = _msg->pose;
+  if (_msg->pose.header.frame_id != desired_frame_id_) {
+    try {
+      pose_stamped = tf_handler_.convert(_msg->pose, desired_frame_id_);
+
+    } catch (tf2::TransformException &ex) {
+      RCLCPP_WARN(this->get_logger(), "Could not get transform: %s", ex.what());
+      return;
+    }
+  }
+
   Eigen::Vector3d position;
-  position.x() = _msg->pose.position.x;
-  position.y() = _msg->pose.position.y;
-  position.z() = _msg->pose.position.z;
+  position.x() = pose_stamped.pose.position.x;
+  position.y() = pose_stamped.pose.position.y;
+  position.z() = pose_stamped.pose.position.z;
   trajectory_generator_->modifyWaypoint(_msg->id, position);
 }
 
@@ -395,7 +444,7 @@ void TrajectoryGeneratorBehavior::plotRefTrajPoint() {
 
 /** Auxiliar Functions **/
 void generateDynamicPoint(
-    const as2_msgs::msg::PoseStampedWithID &msg,
+    const as2_msgs::msg::PoseWithID &msg,
     dynamic_traj_generator::DynamicWaypoint &dynamic_point) {
   dynamic_point.setName(msg.id);
   Eigen::Vector3d position;

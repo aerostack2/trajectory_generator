@@ -43,9 +43,9 @@
 #include <std_srvs/srv/set_bool.hpp>
 
 #include "as2_behavior/behavior_server.hpp"
+#include "as2_core/names/actions.hpp"
 #include "as2_core/names/services.hpp"
 #include "as2_core/names/topics.hpp"
-#include "as2_core/names/actions.hpp"
 #include "as2_core/node.hpp"
 #include "as2_core/utils/frame_utils.hpp"
 #include "as2_core/utils/tf_utils.hpp"
@@ -57,9 +57,9 @@
 #include "motion_reference_handlers/hover_motion.hpp"
 #include "motion_reference_handlers/trajectory_motion.hpp"
 
+#include "as2_msgs/msg/pose_with_id.hpp"
+#include "as2_msgs/msg/pose_stamped_with_id.hpp"
 #include "as2_msgs/msg/traj_gen_info.hpp"
-#include "as2_msgs/msg/trajectory_waypoints.hpp"
-#include "as2_msgs/msg/trajectory_waypoints_with_id.hpp"
 
 #include <Eigen/Dense>
 #include <geometry_msgs/msg/point.hpp>
@@ -168,6 +168,9 @@ class TrajectoryGeneratorBehavior : public as2_behavior::BehaviorServer<
 
   /** Trajectory generator functions */
   void setup();
+  bool goalToDynamicWaypoint(
+      std::shared_ptr<const as2_msgs::action::TrajectoryGenerator::Goal> goal,
+      dynamic_traj_generator::DynamicWaypoint::Vector &waypoints);
   bool evaluateTrajectory(double _eval_time);
   double computeYawAnglePathFacing();
 
@@ -187,7 +190,7 @@ class TrajectoryGeneratorBehavior : public as2_behavior::BehaviorServer<
 /** Auxiliar Functions **/
 
 void generateDynamicPoint(
-    const as2_msgs::msg::PoseStampedWithID &msg,
+    const as2_msgs::msg::PoseWithID &msg,
     dynamic_traj_generator::DynamicWaypoint &dynamic_point);
 
 #endif  // TRAJECTORY_GENERATOR_HPP_

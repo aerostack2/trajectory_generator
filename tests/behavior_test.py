@@ -2,9 +2,8 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.parameter import Parameter
-
-from as2_msgs.msg import TrajectoryWaypointsWithID, YawMode, PoseStampedWithID
 from as2_msgs.action import TrajectoryGenerator
+from as2_msgs.msg import PoseWithID, YawMode
 
 
 class TrajectoryGeneratorClient(Node):
@@ -12,13 +11,13 @@ class TrajectoryGeneratorClient(Node):
     def __init__(self):
         super().__init__('trajectory_generator_action_client')
         self.param_use_sim_time = Parameter(
-            'use_sim_time', Parameter.Type.BOOL, True)
+            'use_sim_time', Parameter.Type.BOOL, False)
         self.set_parameters([self.param_use_sim_time])
         self._action_client = ActionClient(
             self, TrajectoryGenerator, '/drone_sim_0/TrajectoryGeneratorBehaviour')
 
     def send_goal(self):
-        goal = TrajectoryWaypointsWithID()
+        goal = TrajectoryGenerator.Goal()
         goal.header.frame_id = "drone_sim_0/odom"
         goal.header.stamp = self.get_clock().now().to_msg()
         goal.max_speed = 1.0
@@ -27,32 +26,28 @@ class TrajectoryGeneratorClient(Node):
         yaw_mode.angle = 0.0
         goal.yaw = yaw_mode
 
-        pose = PoseStampedWithID()
-        pose.header = goal.header
-        pose.pose.position.x = 0.0
-        pose.pose.position.y = 0.0
-        pose.pose.position.z = 1.0
+        pose0 = PoseWithID()
+        pose0.id = "0"
+        pose0.pose.position.x = 0.0
+        pose0.pose.position.y = 0.0
+        pose0.pose.position.z = 1.0
+        goal.path.append(pose0)
 
-        goal.poses.append(pose)
-        pose.pose.position.z = 2.0
-        goal.poses.append(pose)
-        
-
-        goal_msg = TrajectoryGenerator.Goal()
-        goal_msg.trajectory_waypoints = goal
+        pose1 = PoseWithID()
+        pose1.id = "1"
+        pose1.pose.position.x = 0.0
+        pose1.pose.position.y = 0.0
+        pose1.pose.position.z = 2.0
+        goal.path.append(pose1)
 
         self._action_client.wait_for_server()
-
-        return self._action_client.send_goal_async(goal_msg)
+        return self._action_client.send_goal_async(goal)
 
 
 def main(args=None):
     rclpy.init(args=args)
-
     action_client = TrajectoryGeneratorClient()
-
     future = action_client.send_goal()
-
     rclpy.spin_until_future_complete(action_client, future)
 
 
