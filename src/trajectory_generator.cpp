@@ -90,7 +90,9 @@ void TrajectoryGeneratorBehavior::stateCallback(
     // if (!trajectory_generator_) {
     //   return;
     // }
-
+    current_position_ =
+        Eigen::Vector3d(pose_msg.pose.position.x, pose_msg.pose.position.y,
+                        pose_msg.pose.position.z);
     current_yaw_ = as2::frame::getYawFromQuaternion(pose_msg.pose.orientation);
     trajectory_generator_->updateVehiclePosition(
         Eigen::Vector3d(pose_msg.pose.position.x, pose_msg.pose.position.y,
@@ -174,7 +176,13 @@ bool TrajectoryGeneratorBehavior::on_activate(
   // Generate vector of waypoints for trajectory generator, from goal to
   // dynamic_traj_generator::DynamicWaypoint::Vector
   dynamic_traj_generator::DynamicWaypoint::Vector waypoints_to_set;
-  waypoints_to_set.reserve(goal->path.size());
+  waypoints_to_set.reserve(goal->path.size() + 1);
+
+  // First waypoint is current position
+  dynamic_traj_generator::DynamicWaypoint initial_wp;
+  initial_wp.resetWaypoint(current_position_);
+  initial_wp.setName("initial_position");
+  waypoints_to_set.emplace_back(initial_wp);
 
   if (!goalToDynamicWaypoint(goal, waypoints_to_set)) return false;
 

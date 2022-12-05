@@ -116,6 +116,7 @@ class TrajectoryGeneratorBehavior : public as2_behavior::BehaviorServer<
   float init_yaw_angle_ = 0.0f;
 
   // State
+  Eigen::Vector3d current_position_;
   double current_yaw_;
 
   // Command
