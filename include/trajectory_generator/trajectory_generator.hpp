@@ -50,7 +50,6 @@
 #include "as2_core/utils/frame_utils.hpp"
 #include "as2_core/utils/tf_utils.hpp"
 #include "as2_msgs/action/trajectory_generator.hpp"
-#include "as2_msgs/srv/send_trajectory_waypoints.hpp"
 #include "as2_msgs/srv/set_speed.hpp"
 #include "dynamic_trajectory_generator/dynamic_trajectory.hpp"
 #include "dynamic_trajectory_generator/dynamic_waypoint.hpp"

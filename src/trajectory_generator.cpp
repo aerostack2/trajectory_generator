@@ -400,7 +400,7 @@ void TrajectoryGeneratorBehavior::plotTrajectoryThread() {
   dynamic_traj_generator::References refs;
   const int n_measures = (max_time - min_time) / step;
   auto time_stamp = this->now();
-  path_msg.poses.reserve(n_measures);
+  // path_msg.poses.reserve(n_measures);
   for (float time = min_time; time <= max_time; time += step) {
     geometry_msgs::msg::PoseStamped pose_msg;
     pose_msg.header.frame_id = desired_frame_id_;
