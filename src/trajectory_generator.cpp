@@ -165,24 +165,36 @@ bool TrajectoryGeneratorBehavior::on_activate(
   //   return false;
   // }
 
+  RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator on activate");
+
   if (!has_odom_) {
     RCLCPP_ERROR(this->get_logger(), "No odometry information available");
     return false;
   }
-
-  RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator goal accepted");
   setup();
+
+  // Print goal path
+  RCLCPP_INFO(this->get_logger(), "Waypoints time stamp: %f",
+              goal->header.stamp);
+  for (auto waypoint : goal->path) {
+    RCLCPP_INFO(this->get_logger(), "Waypoint ID: %s", waypoint.id.c_str());
+    RCLCPP_INFO(this->get_logger(), "Waypoint position: %f, %f, %f",
+                waypoint.pose.position.x, waypoint.pose.position.y,
+                waypoint.pose.position.z);
+  }
+
+  trajectory_generator_->setSpeed(goal->max_speed);
 
   // Generate vector of waypoints for trajectory generator, from goal to
   // dynamic_traj_generator::DynamicWaypoint::Vector
   dynamic_traj_generator::DynamicWaypoint::Vector waypoints_to_set;
   waypoints_to_set.reserve(goal->path.size() + 1);
 
-  // First waypoint is current position
-  dynamic_traj_generator::DynamicWaypoint initial_wp;
-  initial_wp.resetWaypoint(current_position_);
-  initial_wp.setName("initial_position");
-  waypoints_to_set.emplace_back(initial_wp);
+  // // First waypoint is current position
+  // dynamic_traj_generator::DynamicWaypoint initial_wp;
+  // initial_wp.resetWaypoint(current_position_);
+  // initial_wp.setName("initial_position");
+  // waypoints_to_set.emplace_back(initial_wp);
 
   if (!goalToDynamicWaypoint(goal, waypoints_to_set)) return false;
 
@@ -190,7 +202,8 @@ bool TrajectoryGeneratorBehavior::on_activate(
   trajectory_generator_->setWaypoints(waypoints_to_set);
 
   yaw_mode_ = goal->yaw;
-  max_speed_ = goal->max_speed;
+
+  RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator goal accepted");
   return true;
 }
 
@@ -217,6 +230,8 @@ bool TrajectoryGeneratorBehavior::on_modify(
   waypoints_to_set.reserve(goal->path.size());
 
   if (!goalToDynamicWaypoint(goal, waypoints_to_set)) return false;
+
+  trajectory_generator_->setSpeed(goal->max_speed);
 
   // Modify each waypoint
   for (dynamic_traj_generator::DynamicWaypoint dynamic_waypoint :
@@ -289,7 +304,17 @@ bool TrajectoryGeneratorBehavior::on_resume(
 void TrajectoryGeneratorBehavior::on_excution_end(
     const as2_behavior::ExecutionStatus &state) {
   RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator end");
+
+  // Reset the trajectory generator
+  trajectory_generator_ =
+      std::make_shared<dynamic_traj_generator::DynamicTrajectory>();
+
   // trajectory_generator_.reset();
+  if (state == as2_behavior::ExecutionStatus::SUCCESS) {
+    return;
+  }
+
+  // If the trajectory generator is not successful, we send a hover command
   hover_motion_handler_.sendHover();
   return;
 };
@@ -301,18 +326,13 @@ as2_behavior::ExecutionStatus TrajectoryGeneratorBehavior::on_run(
         &feedback_msg,
     std::shared_ptr<as2_msgs::action::TrajectoryGenerator::Result>
         &result_msg) {
-  RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator running");
   bool publish_trajectory = false;
   if (first_run_) time_zero_ = this->now();
   rclcpp::Duration eval_time = this->now() - time_zero_;
 
-  RCLCPP_INFO(this->get_logger(), "Time zero: %f", time_zero_.seconds());
-  RCLCPP_INFO(this->get_logger(), "Current time: %f", this->now().seconds());
-  RCLCPP_INFO(this->get_logger(), "Eval time: %f", eval_time.seconds());
-
   if (trajectory_generator_->getMaxTime() + 0.2 < eval_time.seconds() &&
       !first_run_) {
-    RCLCPP_INFO(this->get_logger(), "TrajectoryGenerator finished");
+    result_msg->trajectory_generator_success = true;
     return as2_behavior::ExecutionStatus::SUCCESS;
   }
 
@@ -325,6 +345,7 @@ as2_behavior::ExecutionStatus TrajectoryGeneratorBehavior::on_run(
 
   if (!publish_trajectory) {
     // TODO: When trajectory_generator_->evaluateTrajectory == False?
+    result_msg->trajectory_generator_success = false;
     return as2_behavior::ExecutionStatus::FAILURE;
   }
 

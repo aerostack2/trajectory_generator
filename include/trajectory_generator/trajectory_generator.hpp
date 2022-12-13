@@ -104,7 +104,6 @@ class TrajectoryGeneratorBehavior : public as2_behavior::BehaviorServer<
 
   // Behavior action parameters
   as2_msgs::msg::YawMode yaw_mode_;
-  float max_speed_;
   as2_msgs::action::TrajectoryGenerator::Feedback feedback_;
   as2_msgs::action::TrajectoryGenerator::Result result_;
 

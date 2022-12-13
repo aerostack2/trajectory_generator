@@ -26,12 +26,12 @@ class TrajectoryGeneratorClient(Node):
         yaw_mode.angle = 0.0
         goal.yaw = yaw_mode
 
-        pose0 = PoseWithID()
-        pose0.id = "0"
-        pose0.pose.position.x = 0.0
-        pose0.pose.position.y = 0.0
-        pose0.pose.position.z = 1.0
-        goal.path.append(pose0)
+        # pose0 = PoseWithID()
+        # pose0.id = "0"
+        # pose0.pose.position.x = 0.0
+        # pose0.pose.position.y = 0.0
+        # pose0.pose.position.z = 1.0
+        # goal.path.append(pose0)
 
         pose1 = PoseWithID()
         pose1.id = "1"
