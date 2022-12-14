@@ -174,13 +174,10 @@ bool TrajectoryGeneratorBehavior::on_activate(
   setup();
 
   // Print goal path
-  RCLCPP_INFO(this->get_logger(), "Waypoints time stamp: %f",
-              goal->header.stamp);
   for (auto waypoint : goal->path) {
-    RCLCPP_INFO(this->get_logger(), "Waypoint ID: %s", waypoint.id.c_str());
-    RCLCPP_INFO(this->get_logger(), "Waypoint position: %f, %f, %f",
-                waypoint.pose.position.x, waypoint.pose.position.y,
-                waypoint.pose.position.z);
+    RCLCPP_INFO(this->get_logger(), "Waypoint ID: %s, position : [%f, %f, %f]",
+                waypoint.id.c_str(), waypoint.pose.position.x,
+                waypoint.pose.position.y, waypoint.pose.position.z);
   }
 
   trajectory_generator_->setSpeed(goal->max_speed);
@@ -357,10 +354,23 @@ as2_behavior::ExecutionStatus TrajectoryGeneratorBehavior::on_run(
     }
   }
 
-  trajectory_motion_handler_.sendTrajectoryCommandWithYawAngle(
-      desired_frame_id_, yaw_angle_, traj_command_.position,
-      traj_command_.velocity, traj_command_.acceleration);
-  return as2_behavior::ExecutionStatus::RUNNING;
+  if (!trajectory_motion_handler_.sendTrajectoryCommandWithYawAngle(
+          desired_frame_id_, yaw_angle_, traj_command_.position,
+          traj_command_.velocity, traj_command_.acceleration)) {
+    RCLCPP_ERROR(this->get_logger(),
+                 "TrajectoryGenerator: Could not send trajectory command");
+    result_msg->trajectory_generator_success = false;
+    return as2_behavior::ExecutionStatus::FAILURE;
+  }
+
+  auto next_trajectory_waypoints = trajectory_generator_->getNextTrajectoryWaypoints();
+  feedback_msg->remaining_waypoints = next_trajectory_waypoints.size();
+  if (feedback_msg->remaining_waypoints > 0) {
+    feedback_msg->next_waypoint_id = next_trajectory_waypoints[0].getName();
+  } else {
+    feedback_msg->next_waypoint_id = "";
+  }
+return as2_behavior::ExecutionStatus::RUNNING;
 }
 
 bool TrajectoryGeneratorBehavior::evaluateTrajectory(double _eval_time) {
@@ -402,8 +412,8 @@ bool TrajectoryGeneratorBehavior::evaluateTrajectory(double _eval_time) {
 }
 
 double TrajectoryGeneratorBehavior::computeYawAnglePathFacing() {
-  if (fabs(traj_command_.velocity.x()) > 0.1 ||
-      (traj_command_.velocity.y()) > 0.1) {
+  if (Eigen::Vector2d(traj_command_.velocity.x(), traj_command_.velocity.y())
+          .norm() > 0.1) {
     return as2::frame::getVector2DAngle(traj_command_.velocity.x(),
                                         traj_command_.velocity.y());
   }
